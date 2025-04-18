@@ -19,4 +19,12 @@ public class NicknamePanelController : MonoBehaviour
             NetworkManager.Instance.socket.Emit("LoginCheck", nicknameInputField.text);
         }
     }
+
+    void Start()
+    {
+        // NetworkManager.Instance.socket.OnUnityThread("Login", data =>
+        // {
+        //     
+        // });
+    }
 }
