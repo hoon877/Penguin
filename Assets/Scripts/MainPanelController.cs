@@ -2,6 +2,19 @@ using System.Collections;
 using System.Collections.Generic;
 using SocketIOClient;
 using UnityEngine;
+using Newtonsoft.Json.Linq;
+
+[System.Serializable]
+public class RoomIdData
+{
+    public string roomId;
+}
+
+[System.Serializable]
+public class RoomIdDataArray
+{
+    public RoomIdData[] items;
+}
 
 public class MainPanelController : MonoBehaviour
 {
@@ -12,14 +25,27 @@ public class MainPanelController : MonoBehaviour
         Debug.Log("OnClickCreateRoomButton");
         
         NetworkManager.Instance.socket.Emit("createRoom");
-        
-        NetworkManager.Instance.socket.On("createdRoom", (e) =>
+
+        NetworkManager.Instance.socket.On("createdRoom", (data) =>
         {
-            Debug.Log("새로운 방 생성됨 : " + e);
-            _roomId = e.ToString();
-            Debug.Log(_roomId);
+            string jsonString = data.ToString();
+
+            // JSON 배열 형태로 처리하기 위해 직접 배열 형태로 감싸줌
+            jsonString = "{\"items\":" + jsonString + "}";
+
+            RoomIdDataArray roomDataArray = JsonUtility.FromJson<RoomIdDataArray>(jsonString);
+
+            if (roomDataArray.items.Length > 0)
+            {
+                _roomId = roomDataArray.items[0].roomId;
+                Debug.Log("새로운 방 생성됨: " + _roomId);
+            }
+            else
+            {
+                Debug.LogError("방 ID 데이터가 비어있습니다.");
+            }
         });
-        
+
         NetworkManager.Instance.socket.On("errorJoin", (e) => {
             Debug.LogError("방 접속 실패: " + e);
         });
