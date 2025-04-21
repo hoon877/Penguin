@@ -5,12 +5,7 @@ using TMPro;
 using UnityEngine;
 
 [System.Serializable]
-public class RoomInfo
-{
-    public int currentCnt;
-    public int RoomMaxCnt;
-    public string name;
-}
+
 
 public class LobyManager : MonoBehaviour
 {
