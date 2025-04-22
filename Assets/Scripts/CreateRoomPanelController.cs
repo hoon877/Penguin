@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class CreateRoomPanelController : MonoBehaviour
 {
@@ -35,8 +36,7 @@ public class CreateRoomPanelController : MonoBehaviour
             {
                 _roomId = roomDataArray.items[0].roomId;
                 Debug.Log("새로운 방 생성됨: " + _roomId);
-                Destroy(this.transform.root.gameObject);
-                Debug.Log(1);
+                
             }
             else
             {
@@ -47,6 +47,8 @@ public class CreateRoomPanelController : MonoBehaviour
         NetworkManager.Instance.socket.On("errorJoin", (e) => {
             Debug.LogError("방 접속 실패: " + e);
         });
+        
+        SceneManager.LoadScene("Waiting Room");
     }
     
 }
