@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -5,6 +6,7 @@ using SocketIOClient;
 using UnityEngine;
 using Newtonsoft.Json.Linq;
 using TMPro;
+using UnityEngine.UI;
 
 [System.Serializable]
 public class RoomIdData
@@ -21,6 +23,7 @@ public class RoomIdDataArray
 [System.Serializable]
 public class RoomInfo
 {
+    public string roomName;
     public string roomId;
     public int current;
     public int max;
@@ -35,59 +38,39 @@ public class RoomListResponse
 public class MainPanelController : MonoBehaviour
 {
     private string _roomId;
+    private string _roomName;
     
     [SerializeField] private Transform roomListParent;         // 생성 위치
     [SerializeField] private GameObject roomPanelPrefab;
+    [SerializeField] private GameObject roomEntryPrefab;
+    [SerializeField] private GameObject createRoomPanelPrefab;
+    [SerializeField] private Transform createRoomPanelParent;  
     
     public void OnClickCreateRoomButton()
     {
         Debug.Log("OnClickCreateRoomButton");
         
-        NetworkManager.Instance.socket.Emit("createRoom");
-
-        NetworkManager.Instance.socket.On("createdRoom", (data) =>
-        {
-            string jsonString = data.ToString();
-
-            // JSON 배열 형태로 처리하기 위해 직접 배열 형태로 감싸줌
-            jsonString = "{\"items\":" + jsonString + "}";
-
-            RoomIdDataArray roomDataArray = JsonUtility.FromJson<RoomIdDataArray>(jsonString);
-
-            if (roomDataArray.items.Length > 0)
-            {
-                _roomId = roomDataArray.items[0].roomId;
-                Debug.Log("새로운 방 생성됨: " + _roomId);
-            }
-            else
-            {
-                Debug.LogError("방 ID 데이터가 비어있습니다.");
-            }
-        });
-
-        NetworkManager.Instance.socket.On("errorJoin", (e) => {
-            Debug.LogError("방 접속 실패: " + e);
-        });
+        Instantiate(createRoomPanelPrefab, createRoomPanelParent);
     }
 
-    public void OnClickJoinRoomButton()
-    {
-        Debug.Log("OnClickJoinRoomButton");
-        if (!string.IsNullOrEmpty(_roomId))
-        {
-            // 방 ID가 있을 때만 joinRoom 이벤트를 보냄
-            NetworkManager.Instance.socket.Emit("joinRoom", new { roomId = _roomId });
-
-            NetworkManager.Instance.socket.On("joinedRoom", (e) =>
-            {
-                Debug.Log("joinedRoom");
-            });
-        }
-        else
-        {
-            Debug.LogError("방 ID가 없습니다. 먼저 방을 생성해주세요.");
-        }
-    }
+    // public void OnClickJoinRoomButton()
+    // {
+    //     Debug.Log("OnClickJoinRoomButton");
+    //     if (!string.IsNullOrEmpty(_roomId))
+    //     {
+    //         // 방 ID가 있을 때만 joinRoom 이벤트를 보냄
+    //         NetworkManager.Instance.socket.Emit("joinRoom", new { roomId = _roomId });
+    //
+    //         NetworkManager.Instance.socket.On("joinedRoom", (e) =>
+    //         {
+    //             Debug.Log("joinedRoom");
+    //         });
+    //     }
+    //     else
+    //     {
+    //         Debug.LogError("방 ID가 없습니다. 먼저 방을 생성해주세요.");
+    //     }
+    // }
     
     public void OnClickGetRoomListButton()
     {
@@ -97,61 +80,97 @@ public class MainPanelController : MonoBehaviour
 
         NetworkManager.Instance.socket.On("roomList", (data) =>
         {
-            string json = data.ToString();
-            
-            Debug.Log("받은 JSON: " + json);
-            json = "{\"rooms\":" + json + "}";
-            Debug.Log("JSon :" +  json);
-            
-            RoomListResponse result = JsonUtility.FromJson<RoomListResponse>(json);
-            
-            if (result == null || result.rooms == null || result.rooms.Count == 0)
+            try
             {
-                Debug.Log("⚠ 방이 없습니다.");
-                return;
-            }
-            
-            // Debug.Log(result.rooms[0].roomId);
-            
-            // 기존 UI 제거
-            // foreach (Transform child in roomListParent)
-            // {
-            //     Debug.Log(2);
-            //     Destroy(child.gameObject);
-            // }
-            Debug.Log(result.rooms.Count);
-            Debug.Log(3);
-            
-            foreach (RoomInfo room in result.rooms)
-            {
-                Debug.Log($"[room] roomId: {room.roomId}, current: {room.current}, max: {room.max}");
-                if (roomPanelPrefab == null)
-                {
-                    Debug.LogError("roomPanelPrefab이 null입니다!");
-                    continue;
-                }
+                string json = data.ToString();
+                Debug.Log("받은 JSON: " + json);
 
-                if (roomListParent == null)
+                List<RoomInfo> parsedRooms = new();
+
+                if (json.TrimStart().StartsWith("["))
                 {
-                    Debug.LogError("roomListParent가 null입니다!");
-                    continue;
+                    JArray rawArray = JArray.Parse(json);       // 전체가 이중 배열
+                    JArray roomArray = (JArray)rawArray[0];     // 내부 진짜 room 배열
+
+                    foreach (var token in roomArray)
+                    {
+                        if (token.Type == JTokenType.Object)
+                        {
+                            JObject roomObj = (JObject)token;
+
+                            RoomInfo room = new RoomInfo
+                            {
+                                roomName = roomObj["roomName"]?.ToString(),
+                                roomId = roomObj["roomId"]?.ToString(),
+                                current = roomObj["current"]?.ToObject<int>() ?? 0,
+                                max = roomObj["max"]?.ToObject<int>() ?? 0
+                            };
+
+                            parsedRooms.Add(room);
+                        }
+                    }
+                }
+                else
+                {
+                    
+                    JObject root = JObject.Parse(json);
+                    JArray roomArray = (JArray)root["rooms"];
+
+                    foreach (JToken token in roomArray)
+                    {
+                        if (token is JObject roomToken)
+                        {
+                            RoomInfo room = new RoomInfo
+                            {
+                                roomName = roomToken["roomName"]?.ToString(),
+                                roomId = roomToken["roomId"]?.ToString(),
+                                current = roomToken["current"]?.ToObject<int>() ?? 0,
+                                max = roomToken["max"]?.ToObject<int>() ?? 0
+                            };
+
+                            parsedRooms.Add(room);
+                        }
+                    }
                 }
                 
-                GameObject roomPanel = Instantiate(roomPanelPrefab, roomListParent);
-                Debug.Log(4);
-                
-                // // 자식 요소에서 텍스트/버튼 찾기
-                // TMP_Text roomIdText = roomPanel.transform.Find("RoomIdText").GetComponent<TMP_Text>();
-                // TMP_Text playerCountText = roomPanel.transform.Find("PlayerCountText").GetComponent<TMP_Text>();
-                // UnityEngine.UI.Button joinButton = roomPanel.transform.Find("JoinButton").GetComponent<UnityEngine.UI.Button>();
-                //
-                // roomIdText.text = room.roomId;
-                // playerCountText.text = $"{room.current} / {room.max}";
-                //
-                // joinButton.onClick.AddListener(() =>
-                // {
-                //     NetworkManager.Instance.socket.Emit("joinRoom", new { roomId = room.roomId });
-                // });
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    // RoomPanelPrefab 하나만 생성
+                    GameObject roomPanel = Instantiate(roomPanelPrefab, roomListParent);
+
+                    Transform listContainer = roomPanel.transform.Find("RoomListContainer");
+                    if (listContainer == null)
+                    {
+                        Debug.LogError("RoomListContainer를 찾을 수 없습니다.");
+                        return;
+                    }
+
+                    foreach (RoomInfo room in parsedRooms)
+                    {
+                        GameObject entry = Instantiate(roomEntryPrefab, listContainer);
+
+                        TMP_Text text = entry.transform.Find("RoomText").GetComponent<TMP_Text>();
+                        Button joinButton = entry.transform.Find("JoinButton").GetComponent<Button>();
+
+                        text.text = $"{room.roomName} ({room.current} / {room.max})";
+                        Debug.Log(room.roomName);
+                        string selectedRoomId = room.roomId;
+                        joinButton.onClick.AddListener(() =>
+                        {
+                            Debug.Log($"[참가 클릭] {selectedRoomId}");
+                            NetworkManager.Instance.socket.Emit("joinRoom", new { roomId = selectedRoomId });
+                            
+                            NetworkManager.Instance.socket.On("joinedRoom", (e) =>
+                            {
+                                Debug.Log("joinedRoom");
+                            });
+                        });
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("방 목록 파싱 오류: " + ex.Message);
             }
         });
     }
