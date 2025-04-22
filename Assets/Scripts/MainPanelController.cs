@@ -7,6 +7,7 @@ using UnityEngine;
 using Newtonsoft.Json.Linq;
 using TMPro;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 [System.Serializable]
 public class RoomIdData
@@ -164,6 +165,8 @@ public class MainPanelController : MonoBehaviour
                             {
                                 Debug.Log("joinedRoom");
                             });
+
+                            SceneManager.LoadScene("Waiting Room");
                         });
                     }
                 });
