@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.TextCore.Text;
 
@@ -23,20 +24,37 @@ public class WaitingRoomController : MonoBehaviour
         NetworkManager.Instance.socket.On("move", (data) =>
          {
              Debug.Log("move event received: " + data.ToString());
-             var json = data.ToString();
-             var moveData = JsonUtility.FromJson<MoveData>(json);
-
-             if (moveData.id == myId) return;
-
-             if (!otherPlayers.ContainsKey(moveData.id))
+             Debug.Log(6);
+             try
              {
-                 // 새로운 상대 생성
-                 GameObject other = Instantiate(otherCharacterPrefab, Vector3.zero, Quaternion.identity);
-                 otherPlayers[moveData.id] = other;
-             }
+                 JArray arr = JArray.Parse(data.ToString());
+                 if (arr.Count == 0) return;
 
-             // 상대 위치 갱신
-             otherPlayers[moveData.id].transform.position = new Vector3(moveData.x, 0, moveData.y);
+                 JObject json = (JObject)arr[0];
+
+                 string id = json["id"]?.ToString();
+                 float x = json["x"]?.ToObject<float>() ?? 0;
+                 float y = json["y"]?.ToObject<float>() ?? 0;
+
+                 string myId = NetworkManager.Instance.socket.Id;
+                 if (id == myId) return;
+
+                 MainThreadDispatcher.Enqueue(() =>
+                 {
+                     if (!otherPlayers.ContainsKey(id))
+                     {
+                         GameObject other = Instantiate(otherCharacterPrefab, Vector3.zero, Quaternion.identity);
+                         otherPlayers[id] = other;
+                         Debug.Log($"🟢 상대 캐릭터 생성: {id}");
+                     }
+                     
+                     otherPlayers[id].transform.position = new Vector3(x, 0, y);
+                 });
+             }
+             catch (System.Exception ex)
+             {
+                 Debug.LogError("❌ move 이벤트 파싱 실패: " + ex.Message);
+             }
          });
 
         // 3. 이동 시작 (예: 키 입력으로 move 이벤트 emit)

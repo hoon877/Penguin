@@ -9431,7 +9431,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   myCharacterPrefab: {fileID: 3232569659293657583, guid: 88d8ce49cd99ef84e88128d422383b10, type: 3}
-  otherCharacterPrefab: {fileID: 3232569659293657583, guid: 88d8ce49cd99ef84e88128d422383b10, type: 3}
+  otherCharacterPrefab: {fileID: 3232569659293657583, guid: c813dce475e160e4daf2cb15e5cbfa63, type: 3}
 --- !u!4 &497204861
 Transform:
   m_ObjectHideFlags: 0

@@ -12,9 +12,10 @@ GameObject:
   - component: {fileID: 6362186840232277454}
   - component: {fileID: 3102014543456023977}
   - component: {fileID: 5095841147775931994}
+  - component: {fileID: 3048261784134293228}
   - component: {fileID: 4576516478409555665}
   m_Layer: 0
-  m_Name: Penguin
+  m_Name: Player Penguin
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -149,6 +150,19 @@ CapsuleCollider2D:
   m_Offset: {x: -0.042410612, y: -0.95014274}
   m_Size: {x: 2.0523472, y: 2.6156237}
   m_Direction: 0
+--- !u!114 &3048261784134293228
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3232569659293657583}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 284fd461674247e4da026aa200cf7221, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  moveSpeed: 5
 --- !u!95 &4576516478409555665
 Animator:
   serializedVersion: 5
