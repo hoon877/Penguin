@@ -44,6 +44,11 @@ public class WaitingRoomController : MonoBehaviour
                      if (!otherPlayers.ContainsKey(id))
                      {
                          GameObject other = Instantiate(otherCharacterPrefab, Vector3.zero, Quaternion.identity);
+                         var identifier = other.GetComponent<NetworkPlayerIdentifier>();
+                         if (identifier != null)
+                         {
+                             identifier.playerId = id;
+                         }
                          otherPlayers[id] = other;
                          Debug.Log($"🟢 상대 캐릭터 생성: {id}");
                      }
@@ -70,7 +75,7 @@ public class WaitingRoomController : MonoBehaviour
             NetworkManager.Instance.socket.Emit("move", new
             {
                 x = pos.x,
-                y = pos.z
+                y = pos.y
             });
 
             yield return new WaitForSeconds(0.1f); // 10fps

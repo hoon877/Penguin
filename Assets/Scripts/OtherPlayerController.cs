@@ -6,7 +6,7 @@ public class OtherPlayerController : MonoBehaviour
 {
     [SerializeField] float moveSpeed = 3.0f;
     Animator animator;
-    public bool isWalking;
+    private bool isWalking;
 
     private void Awake()
     {
