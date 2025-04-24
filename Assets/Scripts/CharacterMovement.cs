@@ -9,7 +9,7 @@ public class CharacterMovement : MonoBehaviour
     [SerializeField] GameObject DeadPanelPrefab;
     [SerializeField] Transform target; 
     [SerializeField] float moveSpeed = 3.0f;
-    [SerializeField] float killRange = 1.0f;
+    [SerializeField] float killRange = 10.0f;
     
     private List<string> otherPlayerIds = new List<string>();
     private string myId;
@@ -94,6 +94,7 @@ public class CharacterMovement : MonoBehaviour
         }
 
         Kill();
+
     }
 
     private void Kill()
@@ -101,23 +102,22 @@ public class CharacterMovement : MonoBehaviour
         if (Input.GetMouseButtonDown(0) && !isDead)
         {
             GameObject closest = FindClosestKillableTarget();
+            Debug.Log("🔍 otherPlayers count: " + WaitingRoomController.otherPlayers.Count);
+            Debug.Log(closest);
             if (closest == null) return;
-
             var identifier = closest.GetComponent<NetworkPlayerIdentifier>();
             if (identifier == null || string.IsNullOrEmpty(identifier.playerId)) return;
-
             string targetId = identifier.playerId;
             Debug.Log("🗡 Target ID: " + targetId);
 
             NetworkManager.Instance.socket.Emit("kill", new { targetId });
-
             NetworkManager.Instance.socket.On("killed", (data) =>
             {
                 JObject json = JObject.Parse(data.ToString());
                 string victimId = json["victimId"]?.ToString();
                 string killerId = json["killerId"]?.ToString();
                 myId = NetworkManager.Instance.socket.Id;
-
+                MainThreadDispatcher.Enqueue(() => { Debug.Log(3); });
                 MainThreadDispatcher.Enqueue(() =>
                 {
                     if (victimId == myId)
@@ -144,6 +144,7 @@ public class CharacterMovement : MonoBehaviour
                         }
                     }
                 });
+                Debug.Log(4);
             });
         }
     }
@@ -174,9 +175,14 @@ public class CharacterMovement : MonoBehaviour
         foreach (var kvp in WaitingRoomController.otherPlayers)
         {
             GameObject other = kvp.Value;
-            if (other == null) continue;
+            if (other == null)
+            {
+                Debug.Log($"⚠️ otherPlayers[{kvp.Key}] is null");
+                continue;
+            }
 
-            float dist = Vector2.Distance(transform.position, other.transform.position);
+            float dist = Vector2.Distance((Vector2)transform.position, (Vector2)other.transform.position);
+            Debug.Log($"📏 검사 대상: {kvp.Key}, 거리: {dist}, killRange: {killRange}");
             if (dist < killRange && dist < minDist)
             {
                 minDist = dist;
@@ -184,6 +190,15 @@ public class CharacterMovement : MonoBehaviour
             }
         }
 
+        if (closest == null)
+            Debug.Log("❌ 킬 대상 없음 (모든 대상이 killRange 밖)");
+
         return closest;
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, killRange);
     }
 }
