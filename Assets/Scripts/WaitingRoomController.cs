@@ -9,7 +9,7 @@ public class WaitingRoomController : MonoBehaviour
     public GameObject myCharacterPrefab;
     public GameObject otherCharacterPrefab;
 
-    private Dictionary<string, GameObject> otherPlayers = new();
+    public static Dictionary<string, GameObject> otherPlayers = new();
     private GameObject myCharacter;
 
     void Start()
@@ -23,8 +23,6 @@ public class WaitingRoomController : MonoBehaviour
         //2.서버에 "move" 이벤트 등록
         NetworkManager.Instance.socket.On("move", (data) =>
          {
-             Debug.Log("move event received: " + data.ToString());
-             Debug.Log(6);
              try
              {
                  JArray arr = JArray.Parse(data.ToString());
@@ -48,6 +46,8 @@ public class WaitingRoomController : MonoBehaviour
                          if (identifier != null)
                          {
                              identifier.playerId = id;
+                             Debug.Log("id : " + id);
+                             Debug.Log("indentifier id : " + identifier.playerId);
                          }
                          otherPlayers[id] = other;
                          Debug.Log($"🟢 상대 캐릭터 생성: {id}");

@@ -2,17 +2,22 @@ using Newtonsoft.Json.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using static UnityEngine.GraphicsBuffer;
+
 
 public class CharacterMovement : MonoBehaviour
 {
     [SerializeField] GameObject DeadPanelPrefab;
-    [SerializeField] Transform target; // ªÛ¥Î ƒ≥∏Ø≈Õ¿« Transform
+    [SerializeField] Transform target; 
     [SerializeField] float moveSpeed = 3.0f;
     [SerializeField] float killRange = 1.0f;
+    
+    private List<string> otherPlayerIds = new List<string>();
+    private string myId;
+    
     Vector2 moveDir;
     Rigidbody2D rb;
     Animator animator;
+    
     float vertical;
     float horizontal;
     bool isDead = false;
@@ -23,6 +28,32 @@ public class CharacterMovement : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         moveDir = Vector2.zero;
+    }
+    
+    void Start()
+    {
+        // ÎÇ¥ ÌîåÎ†àÏù¥Ïñ¥ ID
+        myId = NetworkManager.Instance.socket.Id;
+        // ÏÑúÎ≤ÑÏóê ÏöîÏ≤≠
+        NetworkManager.Instance.socket.Emit("getPlayers");
+
+        // ÏùëÎãµ ÏàòÏã†
+        NetworkManager.Instance.socket.On("playersInRoom", (data) =>
+        {
+            JArray arr = JArray.Parse(data.ToString());
+            otherPlayerIds.Clear();
+
+            foreach (var idToken in arr)
+            {
+                string id = idToken.ToString();
+                if (id != myId)
+                {
+                    otherPlayerIds.Add(id);
+                }
+            }
+
+            Debug.Log("üë• ÏÉÅÎåÄ ID Î™©Î°ù Î∞õÏïÑÏò¥: " + string.Join(", ", otherPlayerIds));
+        });
     }
 
     private void FixedUpdate()
@@ -59,7 +90,7 @@ public class CharacterMovement : MonoBehaviour
         }
         else
         {
-            animator.SetBool("Walk", false); // ?? ¡◊æ˙¿ª ∂© Walk false ∞Ì¡§
+            animator.SetBool("Walk", false); 
         }
 
         Kill();
@@ -67,42 +98,52 @@ public class CharacterMovement : MonoBehaviour
 
     private void Kill()
     {
-        if (Input.GetMouseButtonDown(0) && !isDead && IsInKillRange())
+        if (Input.GetMouseButtonDown(0) && !isDead)
         {
-            // ªÛ¥Î ID ∞°¡Æø¿±‚
-            var identifier = target.GetComponent<NetworkPlayerIdentifier>();
-            if (identifier == null) return;
+            GameObject closest = FindClosestKillableTarget();
+            if (closest == null) return;
+
+            var identifier = closest.GetComponent<NetworkPlayerIdentifier>();
+            if (identifier == null || string.IsNullOrEmpty(identifier.playerId)) return;
 
             string targetId = identifier.playerId;
+            Debug.Log("üó° Target ID: " + targetId);
 
-            // º≠πˆø° ≈≥ ø‰√ª
             NetworkManager.Instance.socket.Emit("kill", new { targetId });
-
-            Debug.Log("?? ≈≥ ø‰√ª ¿¸º€: " + targetId);
 
             NetworkManager.Instance.socket.On("killed", (data) =>
             {
                 JObject json = JObject.Parse(data.ToString());
-
                 string victimId = json["victimId"]?.ToString();
-                string myId = NetworkManager.Instance.socket.Id;
+                string killerId = json["killerId"]?.ToString();
+                myId = NetworkManager.Instance.socket.Id;
 
-                if (victimId == myId)
+                MainThreadDispatcher.Enqueue(() =>
                 {
-                    Debug.Log("? ≥ª∞° ¡◊æ˙¿Ω");
-                    isDead = true;
-                    GameObject panelInstance = Instantiate(DeadPanelPrefab, Vector3.zero, Quaternion.identity);
-                    Destroy(panelInstance, seconds);
-                    StartCoroutine(ReviveAfterDelay());
-                }
-                else
-                {
-                    Debug.Log("? ¥Ÿ∏• ªÁ∂˜¿Ã ¡◊æ˙¿Ω: " + victimId);
-                    //if (otherPlayers.ContainsKey(victimId))
-                    //{
-                    //    otherPlayers[victimId].SetActive(false); // or death animation
-                    //}
-                }
+                    if (victimId == myId)
+                    {
+                        Debug.Log(2);
+                        isDead = true;
+                        GameObject panelInstance = Instantiate(DeadPanelPrefab, Vector3.zero, Quaternion.identity);
+                        Destroy(panelInstance, seconds);
+                        StartCoroutine(DeadAfterDelay());
+                    }
+                    else
+                    {
+                        if (WaitingRoomController.otherPlayers.TryGetValue(victimId, out GameObject victimGo))
+                        {
+                            CharacterMovement victimMovement = victimGo.GetComponent<CharacterMovement>();
+                            if (victimMovement != null)
+                            {
+                                victimMovement.SetDead();
+                            }
+
+                            Debug.Log(1);
+                            GameObject panelInstance = Instantiate(DeadPanelPrefab, victimGo.transform.position, Quaternion.identity);
+                            Destroy(panelInstance, seconds);
+                        }
+                    }
+                });
             });
         }
     }
@@ -113,9 +154,36 @@ public class CharacterMovement : MonoBehaviour
         return distance <= killRange;
     }
 
-    IEnumerator ReviveAfterDelay()
+    IEnumerator DeadAfterDelay()
     {
         yield return new WaitForSeconds(seconds);
         isDead = false;
+    }
+    
+    public void SetDead()
+    {
+        isDead = true;
+        animator.SetBool("Walk", false);
+    }
+    
+    private GameObject FindClosestKillableTarget()
+    {
+        float minDist = float.MaxValue;
+        GameObject closest = null;
+
+        foreach (var kvp in WaitingRoomController.otherPlayers)
+        {
+            GameObject other = kvp.Value;
+            if (other == null) continue;
+
+            float dist = Vector2.Distance(transform.position, other.transform.position);
+            if (dist < killRange && dist < minDist)
+            {
+                minDist = dist;
+                closest = other;
+            }
+        }
+
+        return closest;
     }
 }
