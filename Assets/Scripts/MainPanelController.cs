@@ -53,25 +53,6 @@ public class MainPanelController : MonoBehaviour
         
         Instantiate(createRoomPanelPrefab, createRoomPanelParent);
     }
-
-    // public void OnClickJoinRoomButton()
-    // {
-    //     Debug.Log("OnClickJoinRoomButton");
-    //     if (!string.IsNullOrEmpty(_roomId))
-    //     {
-    //         // 방 ID가 있을 때만 joinRoom 이벤트를 보냄
-    //         NetworkManager.Instance.socket.Emit("joinRoom", new { roomId = _roomId });
-    //
-    //         NetworkManager.Instance.socket.On("joinedRoom", (e) =>
-    //         {
-    //             Debug.Log("joinedRoom");
-    //         });
-    //     }
-    //     else
-    //     {
-    //         Debug.LogError("방 ID가 없습니다. 먼저 방을 생성해주세요.");
-    //     }
-    // }
     
     public void OnClickGetRoomListButton()
     {
