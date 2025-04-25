@@ -17,7 +17,8 @@ public class WaitingRoomController : MonoBehaviour
     [Header("UI Elements")]
     public TMP_Text playerCountText;   // 방 인원 수 표시용 텍스트
     public Button startGameButton;     // 게임 시작 버튼
-    
+    public Button leaveRoomButton; //방 나가기 버튼
+
     private int currentPlayers = 0;
     private int maxPlayers = 0;
     
@@ -27,32 +28,7 @@ public class WaitingRoomController : MonoBehaviour
         Vector3 spawnPos = new Vector3(Random.Range(-3f, 3f), 0, Random.Range(-3f, 3f));
         myCharacter = Instantiate(myCharacterPrefab, spawnPos, Quaternion.identity);
 
-        // 현재 방 인원 요청 및 UI 업데이트
-        NetworkManager.Instance.socket.Emit("getRoomPlayerCount");
-        NetworkManager.Instance.socket.On("roomPlayerCount", (data) =>
-        {
-            JObject json = JObject.Parse(data.ToString());
-            currentPlayers = json["current"].ToObject<int>();
-            maxPlayers = json["max"].ToObject<int>();
-
-            MainThreadDispatcher.Enqueue(() =>
-            {
-                UpdatePlayerCountUI();
-            });
-        });
-
-        // 게임 시작 버튼 이벤트 등록
-        startGameButton.onClick.AddListener(OnStartGameClicked);
-
-        // 게임 시작 이벤트 리스너
-        NetworkManager.Instance.socket.On("gameStarted", (_) =>
-        {
-            MainThreadDispatcher.Enqueue(() =>
-            {
-                Debug.Log("게임 시작됨!");
-                SceneManager.LoadScene("GameScene"); // 게임 씬으로 이동
-            });
-        });
+        
         
         //2.서버에 "move" 이벤트 등록
         NetworkManager.Instance.socket.On("move", (data) =>
@@ -98,7 +74,46 @@ public class WaitingRoomController : MonoBehaviour
 
         // 3. 이동 시작 (예: 키 입력으로 move 이벤트 emit)
         StartCoroutine(SendMoveLoop());
-        
+
+
+        // 현재 방 인원 요청 및 UI 업데이트
+        NetworkManager.Instance.socket.Emit("getRoomPlayerCount");
+        NetworkManager.Instance.socket.On("roomPlayerCount", (data) =>
+        {
+            try
+            {
+                JArray arr = JArray.Parse(data.ToString());
+                JObject json = (JObject)arr[0];
+                currentPlayers = json["current"].ToObject<int>();
+                maxPlayers = json["max"].ToObject<int>();
+
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    UpdatePlayerCountUI();
+                });
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("❌ roomPlayerCount 파싱 실패: " + ex.Message);
+                Debug.LogError("받은 원본 데이터: " + data);
+            }
+        });
+
+        // 게임 시작 버튼 이벤트 등록
+        startGameButton.onClick.AddListener(OnStartGameClicked);
+
+        // 게임 시작 이벤트 리스너
+        NetworkManager.Instance.socket.On("gameStarted", (_) =>
+        {
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                Debug.Log("게임 시작됨!");
+                SceneManager.LoadScene("Game"); // 게임 씬으로 이동
+            });
+        });
+
+        // 방 나가기 버튼 이벤트 등록
+        leaveRoomButton.onClick.AddListener(OnLeaveRoomClicked);
     }
 
     private void UpdatePlayerCountUI()
@@ -111,12 +126,19 @@ public class WaitingRoomController : MonoBehaviour
         NetworkManager.Instance.socket.Emit("startGame");
     }
 
-    private void OnDestroy()
+    public void OnLeaveRoomClicked()
     {
-        NetworkManager.Instance.socket.Off("roomPlayerCount");
-        NetworkManager.Instance.socket.Off("gameStarted");
+        Debug.Log("방 나가기 요청");
+
+        NetworkManager.Instance.socket.Emit("leaveRoom", new
+        {
+            roomId = NetworkManager.Instance.socket.Id // 또는 저장해 둔 roomId
+        });
+
+        // 클라이언트가 먼저 씬을 나가도 괜찮음 (서버는 나중에 처리됨)
+        SceneManager.LoadScene("Main"); // 또는 로비 씬 이름
     }
-    
+
     IEnumerator SendMoveLoop()
     {
         while (true)

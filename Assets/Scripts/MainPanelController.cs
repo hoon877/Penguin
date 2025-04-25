@@ -120,6 +120,16 @@ public class MainPanelController : MonoBehaviour
                     // RoomPanelPrefab 하나만 생성
                     GameObject roomPanel = Instantiate(roomPanelPrefab, roomListParent);
 
+                    // ✅ 닫기 버튼 핸들링
+                    Button closeButton = roomPanel.transform.Find("CloseButton")?.GetComponent<Button>();
+                    if (closeButton != null)
+                    {
+                        closeButton.onClick.AddListener(() =>
+                        {
+                            Destroy(roomPanel);  // 방 리스트 UI 제거
+                        });
+                    }
+
                     Transform listContainer = roomPanel.transform.Find("RoomListContainer");
                     if (listContainer == null)
                     {

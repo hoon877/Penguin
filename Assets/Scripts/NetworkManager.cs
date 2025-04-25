@@ -11,6 +11,8 @@ public class NetworkManager : Singleton<NetworkManager>
 
     private void Start()
     {
+        DontDestroyOnLoad(this.gameObject);
+
         socket = new SocketIOUnity(Constant.GameServerURL);
         
         socket.OnConnected += (sender, e) => { Debug.Log("connected"); };
@@ -23,7 +25,10 @@ public class NetworkManager : Singleton<NetworkManager>
     
     private void OnDestroy()
     {
-        socket.Disconnect();
+        if (socket != null && socket.Connected)
+        {
+            socket.Disconnect();
+        }
     }
 
 

@@ -51,4 +51,8 @@ public class CreateRoomPanelController : MonoBehaviour
         SceneManager.LoadScene("Waiting Room");
     }
     
+    public void OnClickCancelButton()
+    {
+        Destroy(targetPanelToDestroy);
+    }
 }

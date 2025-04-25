@@ -102,7 +102,6 @@ public class CharacterMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        Debug.Log(isDead);
         if (!isDead && !isKill)
         {
             Move();
