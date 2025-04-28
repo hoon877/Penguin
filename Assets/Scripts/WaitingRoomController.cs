@@ -28,7 +28,12 @@ public class WaitingRoomController : MonoBehaviour
         Vector3 spawnPos = new Vector3(Random.Range(-3f, 3f), 0, Random.Range(-3f, 3f));
         myCharacter = Instantiate(myCharacterPrefab, spawnPos, Quaternion.identity);
 
-        
+        // ✅ 생성 직후 카메라에 타겟 설정
+        FollowCamera followCam = Camera.main.GetComponent<FollowCamera>();
+        if (followCam != null)
+        {
+            followCam.SetTarget(myCharacter.transform);
+        }
         
         //2.서버에 "move" 이벤트 등록
         NetworkManager.Instance.socket.On("move", (data) =>

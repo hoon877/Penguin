@@ -49,15 +49,11 @@ public class MainPanelController : MonoBehaviour
     
     public void OnClickCreateRoomButton()
     {
-        Debug.Log("OnClickCreateRoomButton");
-        
         Instantiate(createRoomPanelPrefab, createRoomPanelParent);
     }
     
     public void OnClickGetRoomListButton()
     {
-        Debug.Log("방 목록 요청");
-
         NetworkManager.Instance.socket.Emit("getRoomList");
 
         NetworkManager.Instance.socket.On("roomList", (data) =>
@@ -65,8 +61,6 @@ public class MainPanelController : MonoBehaviour
             try
             {
                 string json = data.ToString();
-                Debug.Log("받은 JSON: " + json);
-
                 List<RoomInfo> parsedRooms = new();
 
                 if (json.TrimStart().StartsWith("["))
@@ -145,17 +139,12 @@ public class MainPanelController : MonoBehaviour
                         Button joinButton = entry.transform.Find("JoinButton").GetComponent<Button>();
 
                         text.text = $"{room.roomName} ({room.current} / {room.max})";
-                        Debug.Log(room.roomName);
                         string selectedRoomId = room.roomId;
                         joinButton.onClick.AddListener(() =>
                         {
-                            Debug.Log($"[참가 클릭] {selectedRoomId}");
                             NetworkManager.Instance.socket.Emit("joinRoom", new { roomId = selectedRoomId });
                             
-                            NetworkManager.Instance.socket.On("joinedRoom", (e) =>
-                            {
-                                Debug.Log("joinedRoom");
-                            });
+                            NetworkManager.Instance.socket.On("joinedRoom", (e) => { });
 
                             SceneManager.LoadScene("Waiting Room");
                         });

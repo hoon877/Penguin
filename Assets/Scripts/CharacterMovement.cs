@@ -2,6 +2,7 @@ using Newtonsoft.Json.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class CharacterMovement : MonoBehaviour
 {
@@ -13,24 +14,36 @@ public class CharacterMovement : MonoBehaviour
     private Vector2 moveDir;
     private Rigidbody2D rb;
     private Animator animator;
-
+    private SpriteRenderer spriteRenderer;
+    
     float vertical;
     float horizontal;
     bool isDead = false;
     bool isKill = false;
     float seconds = 1f;
-
+    private bool canKill = false; // 처음에는 Kill 불가
+    private bool isKillableScene = false;
+    private string currentSceneName;
+    
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         moveDir = Vector2.zero;
+        spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
     void Start()
     {
+        currentSceneName = SceneManager.GetActiveScene().name;
+        isKillableScene = currentSceneName == "Game";
+        if (isKillableScene)
+        {
+            StartCoroutine(EnableKillAfterDelay());
+        }
+        
         myId = NetworkManager.Instance.socket.Id;
-
+        
         // 플레이어들 가져오기
         NetworkManager.Instance.socket.Emit("getPlayers");
         NetworkManager.Instance.socket.On("playersInRoom", (data) =>
@@ -59,12 +72,10 @@ public class CharacterMovement : MonoBehaviour
                 JObject json = (JObject)arr[0];
                 string victimId = json["victimId"]?.ToString();
                 string killerId = json["killerId"]?.ToString();
-
                 MainThreadDispatcher.Enqueue(() =>
                 {
                     if (victimId == myId)
                     {
-                        Debug.Log("killed" + killerId);
                         isDead = true;
                         GameObject panelInstance = Instantiate(DeadPanelPrefab, Vector3.zero, Quaternion.identity);
                         Destroy(panelInstance, seconds);
@@ -78,9 +89,7 @@ public class CharacterMovement : MonoBehaviour
                             var animCtrl = victimGo.GetComponent<CharacterAnimatorController>();
                             if (animCtrl != null)
                             {
-                                Debug.Log("상대방 SetDead() 호출됨");
                                 animCtrl.SetDead();
-
                             }
                             else
                             {
@@ -117,6 +126,16 @@ public class CharacterMovement : MonoBehaviour
         moveDir.y = rb.position.y + (vertical * moveSpeed * Time.deltaTime);
 
         rb.MovePosition(moveDir);
+        
+        // ✅ 왼쪽/오른쪽 이동 방향에 따라 flip 처리
+        if (horizontal < 0)
+        {
+            spriteRenderer.flipX = true;
+        }
+        else if (horizontal > 0)
+        {
+            spriteRenderer.flipX = false;
+        }
     }
 
     private void Update()
@@ -140,18 +159,17 @@ public class CharacterMovement : MonoBehaviour
 
     private void Kill()
     {
+        if (!canKill) return;
+        
         if (Input.GetMouseButtonDown(0) && !isDead)
         {
             GameObject closest = FindClosestKillableTarget();
             if (closest == null) return;
-
             var identifier = closest.GetComponent<NetworkPlayerIdentifier>();
             if (identifier == null || string.IsNullOrEmpty(identifier.playerId)) return;
-
             // ✅ 킬 시 이동 제한
             isKill = true;
             StartCoroutine(SetKillCooldown());
-            
             string targetId = identifier.playerId;
             NetworkManager.Instance.socket.Emit("kill", new { targetId });
         }
@@ -188,12 +206,12 @@ public class CharacterMovement : MonoBehaviour
     {
         isDead = true;
         animator.SetBool("Dead", true);
-        Debug.Log("Dead");
     }
-
-    private void OnDrawGizmosSelected()
+    
+    IEnumerator EnableKillAfterDelay()
     {
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, killRange);
+        yield return new WaitForSeconds(30f);
+        canKill = true;
+        Debug.Log("이제 킬이 가능합니다!");
     }
 }
