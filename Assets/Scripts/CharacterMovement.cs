@@ -1,8 +1,10 @@
 using Newtonsoft.Json.Linq;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class CharacterMovement : MonoBehaviour
 {
@@ -25,6 +27,10 @@ public class CharacterMovement : MonoBehaviour
     private bool isKillableScene = false;
     private string currentSceneName;
     
+    private Button killButton;
+    private TMP_Text killButtonText;
+    
+    private float killCooldown = 30f;
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -39,7 +45,16 @@ public class CharacterMovement : MonoBehaviour
         isKillableScene = currentSceneName == "Game";
         if (isKillableScene)
         {
-            StartCoroutine(EnableKillAfterDelay());
+            killButton = GameObject.Find("KillButton")?.GetComponent<Button>();
+            killButtonText = GameObject.Find("KillButtonText")?.GetComponent<TMP_Text>();
+
+            if (killButton != null)
+            {
+                killButton.onClick.AddListener(OnKillButtonClicked);
+                killButton.interactable = false; // 처음에는 비활성화
+            }
+
+            StartCoroutine(KillCooldownRoutine());
         }
         
         myId = NetworkManager.Instance.socket.Id;
@@ -149,29 +164,9 @@ public class CharacterMovement : MonoBehaviour
             animator.SetBool("Walk", false);
         }
 
-        Kill();
-
         if (Input.GetKeyDown(KeyCode.Space))
         {
             SetDead();
-        }
-    }
-
-    private void Kill()
-    {
-        if (!canKill) return;
-        
-        if (Input.GetMouseButtonDown(0) && !isDead)
-        {
-            GameObject closest = FindClosestKillableTarget();
-            if (closest == null) return;
-            var identifier = closest.GetComponent<NetworkPlayerIdentifier>();
-            if (identifier == null || string.IsNullOrEmpty(identifier.playerId)) return;
-            // ✅ 킬 시 이동 제한
-            isKill = true;
-            StartCoroutine(SetKillCooldown());
-            string targetId = identifier.playerId;
-            NetworkManager.Instance.socket.Emit("kill", new { targetId });
         }
     }
 
@@ -206,12 +201,106 @@ public class CharacterMovement : MonoBehaviour
     {
         isDead = true;
         animator.SetBool("Dead", true);
+        
+        if (killButton != null)
+        {
+            killButton.interactable = false;
+        }
+        if (killButtonText != null)
+        {
+            killButtonText.text = null; // ✅ 죽으면 즉시 텍스트 비우기
+        }
     }
     
-    IEnumerator EnableKillAfterDelay()
+    IEnumerator KillCooldownRoutine()
     {
-        yield return new WaitForSeconds(30f);
+        float remainingTime = killCooldown;
+
+        while (remainingTime > 0f)
+        {
+            if (isDead) yield break;
+            
+            if (killButtonText != null)
+            {
+                killButtonText.text = $"{Mathf.CeilToInt(remainingTime)}초";
+            }
+
+            remainingTime -= Time.deltaTime;
+            yield return null;
+        }
+        
+        if (isDead) yield break;
+
+        if (killButton != null)
+        {
+            killButton.interactable = true;
+        }
+        if (killButtonText != null)
+        {
+            killButtonText.text = null;
+        }
+
         canKill = true;
-        Debug.Log("이제 킬이 가능합니다!");
+    }
+    
+    private void OnKillButtonClicked()
+    {
+        if (!canKill) return; // 아직 킬 불가
+
+        GameObject closest = FindClosestKillableTarget();
+        if (closest == null) return;
+
+        var identifier = closest.GetComponent<NetworkPlayerIdentifier>();
+        if (identifier == null || string.IsNullOrEmpty(identifier.playerId)) return;
+
+        isKill = true;
+        StartCoroutine(SetKillCooldown());
+
+        string targetId = identifier.playerId;
+        NetworkManager.Instance.socket.Emit("kill", new { targetId });
+        
+        StartCoroutine(RestartKillCooldown());
+    }
+    
+    IEnumerator RestartKillCooldown()
+    {
+        // 즉시 버튼 비활성화
+        if (killButton != null)
+        {
+            killButton.interactable = false;
+        }
+        if (killButtonText != null)
+        {
+            killButtonText.text = $"{Mathf.CeilToInt(killCooldown)}초";
+        }
+
+        canKill = false; // 다시 쿨다운 시작
+        float remainingTime = killCooldown;
+
+        while (remainingTime > 0f)
+        {
+            if (isDead) yield break;
+            
+            if (killButtonText != null)
+            {
+                killButtonText.text = $"{Mathf.CeilToInt(remainingTime)}초";
+            }
+
+            remainingTime -= Time.deltaTime;
+            yield return null;
+        }
+
+        if (isDead) yield break;
+        
+        if (killButton != null)
+        {
+            killButton.interactable = true;
+        }
+        if (killButtonText != null)
+        {
+            killButtonText.text = "KILL";
+        }
+
+        canKill = true;
     }
 }

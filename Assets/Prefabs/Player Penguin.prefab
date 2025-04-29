@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5095841147775931994}
   - component: {fileID: 3048261784134293228}
   - component: {fileID: 4576516478409555665}
+  - component: {fileID: 1290367740891900863}
   m_Layer: 0
   m_Name: Player Penguin
   m_TagString: Untagged
@@ -165,7 +166,6 @@ MonoBehaviour:
   DeadPanelPrefab: {fileID: 3400582959984163587, guid: 2dd18c42403cb8a4a8b3e108987369ff, type: 3}
   moveSpeed: 5
   killRange: 4
-  killButton: {fileID: 6989134449737675019, guid: 93d2f7d49f1d09848bd42c5bcb7b50e8, type: 3}
 --- !u!95 &4576516478409555665
 Animator:
   serializedVersion: 5
@@ -187,3 +187,18 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &1290367740891900863
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3232569659293657583}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e17cec68ba34a04aa2af81f6eac9339, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHunger: 100
+  hungerDecreaseRate: 1
+  currentHunger: 0
