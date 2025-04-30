@@ -163,11 +163,6 @@ public class CharacterMovement : MonoBehaviour
         {
             animator.SetBool("Walk", false);
         }
-
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            SetDead();
-        }
     }
 
     private GameObject FindClosestKillableTarget()
@@ -196,11 +191,17 @@ public class CharacterMovement : MonoBehaviour
         yield return new WaitForSeconds(seconds);
         isKill = false;
     }
-
+    
     public void SetDead()
     {
         isDead = true;
         animator.SetBool("Dead", true);
+        
+        HungerSystem hunger = GetComponent<HungerSystem>();
+        if (hunger != null)
+        {
+            hunger.Kill();  // ➕ 이거!
+        }
         
         if (killButton != null)
         {
@@ -302,5 +303,10 @@ public class CharacterMovement : MonoBehaviour
         }
 
         canKill = true;
+    }
+    
+    public void SetMovementSpeed(float newSpeed)
+    {
+        moveSpeed = newSpeed;
     }
 }

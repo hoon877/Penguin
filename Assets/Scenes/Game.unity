@@ -183,13 +183,13 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 469265054}
-  m_LocalRotation: {x: -0, y: 0.43288577, z: -0, w: 0.90144885}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -258}
-  m_LocalScale: {x: 1.0452907, y: 0.74368, z: 0.7079462}
+  m_LocalScale: {x: 0.65332764, y: 0.74368, z: 0.7079462}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 339892616}
-  m_LocalEulerAnglesHint: {x: 0, y: 51.302, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: -71, y: -25}
@@ -127309,6 +127309,7 @@ GameObject:
   - component: {fileID: 2050841931}
   - component: {fileID: 2050841930}
   - component: {fileID: 2050841932}
+  - component: {fileID: 2050841933}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -127357,6 +127358,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a8ebf849aabeaa147966ef92437217f2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &2050841933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2050841929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da837a9e4905db547af00c45feb87285, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hungerSlider: {fileID: 1897274121}
+  BackgroundImage: {fileID: 1179901225}
+  normalColor: {r: 1, g: 1, b: 1, a: 1}
+  blinkColor: {r: 1, g: 0, b: 0, a: 1}
+  blinkInterval: 0.5
 --- !u!1 &2060629621
 GameObject:
   m_ObjectHideFlags: 0

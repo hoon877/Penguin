@@ -4,34 +4,18 @@ using UnityEngine.UI;
 
 public class HungerSystem : MonoBehaviour
 {
-    [Header("Hunger Config")]
     public float maxHunger = 100f;
     public float hungerDecreaseRate = 1f;
     public float currentHunger;
 
-    [Header("UI")]
-    private Slider hungerSlider; // -> 이건 Game 씬 Canvas 안에 있는 슬라이더를 연결해야 함
-
     private bool isAlive = true;
+    private bool starving = false;
+    private HungerUIController uiController;
 
     private void Start()
     {
         currentHunger = maxHunger;
-
-        if (hungerSlider == null)
-        {
-            // GameScene 안에 있는 "HungerSlider" 오브젝트를 찾아 자동으로 연결
-            GameObject sliderObj = GameObject.Find("HungerSlider");
-            if (sliderObj != null)
-            {
-                hungerSlider = sliderObj.GetComponent<Slider>();
-            }
-            else
-            {
-                Debug.LogWarning("❗ HungerSlider를 찾지 못했습니다. 이름 확인 필요.");
-            }
-        }
-
+        uiController = FindObjectOfType<HungerUIController>();
         UpdateUI();
         StartCoroutine(HungerDecreaseLoop());
     }
@@ -46,31 +30,56 @@ public class HungerSystem : MonoBehaviour
             currentHunger = Mathf.Clamp(currentHunger, 0, maxHunger);
             UpdateUI();
 
-            if (currentHunger <= 0)
+            if (currentHunger <= 0 && !starving)
             {
-                Debug.Log($"{gameObject.name}: 배고픔이 0! 추가 효과 처리 가능.");
-                // 예: 체력 감소 시작
+                starving = true;
+                uiController?.StartBlink();
+                StartCoroutine(HandleStarvation());
             }
         }
     }
 
-    private void UpdateUI()
+    private IEnumerator HandleStarvation()
     {
-        if (hungerSlider != null)
+        // 디버프 처리 (속도 감소 등)
+        GetComponent<CharacterMovement>()?.SetMovementSpeed(1.0f);
+
+        yield return new WaitForSeconds(30f);
+
+        if (isAlive)
         {
-            hungerSlider.value = currentHunger / maxHunger;
+            GetComponent<CharacterMovement>()?.SetDead();
+            uiController?.StopBlink();
+            isAlive = false;
         }
     }
 
     public void Eat(float amount)
     {
+        if (!isAlive) return;
+
         currentHunger += amount;
         currentHunger = Mathf.Clamp(currentHunger, 0, maxHunger);
         UpdateUI();
+
+        if (starving && currentHunger > 0)
+        {
+            starving = false;
+            uiController?.StopBlink();
+            GetComponent<CharacterMovement>()?.SetMovementSpeed(3.0f);
+        }
     }
 
+    void UpdateUI()
+    {
+        uiController?.UpdateSlider(currentHunger / maxHunger);
+    }
+    
     public void Kill()
     {
         isAlive = false;
+
+        // 슬라이더 깜빡임 멈추기
+        uiController?.StopBlink();
     }
 }
