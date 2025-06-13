@@ -8,9 +8,15 @@ using UnityEngine.UI;
 
 public class CharacterMovement : MonoBehaviour
 {
+    public static HashSet<string> DeadPlayerIds = new HashSet<string>();
+
     [SerializeField] GameObject DeadPanelPrefab;
     [SerializeField] float moveSpeed = 3.0f;
-    [SerializeField] float killRange = 10.0f;
+    [SerializeField] float killRange = 4.0f;
+
+    [SerializeField] private float eatRange = 4.0f;
+    [SerializeField] private float hungerRecovery = 30f;
+    private Button eatButton;
 
     private string myId;
     private Vector2 moveDir;
@@ -31,6 +37,7 @@ public class CharacterMovement : MonoBehaviour
     private TMP_Text killButtonText;
     
     private float killCooldown = 30f;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -41,12 +48,18 @@ public class CharacterMovement : MonoBehaviour
 
     void Start()
     {
+
         currentSceneName = SceneManager.GetActiveScene().name;
         isKillableScene = currentSceneName == "Game";
         if (isKillableScene)
         {
             killButton = GameObject.Find("KillButton")?.GetComponent<Button>();
             killButtonText = GameObject.Find("KillButtonText")?.GetComponent<TMP_Text>();
+
+            eatButton = GameObject.Find("EatButton")?.GetComponent<Button>();
+
+            if (eatButton != null)
+                eatButton.onClick.AddListener(OnEatButtonClicked);
 
             if (killButton != null)
             {
@@ -76,7 +89,6 @@ public class CharacterMovement : MonoBehaviour
             }
         });
 
-        // ✅ killed 이벤트는 여기에서 1회만 등록!
         NetworkManager.Instance.socket.On("killed", (data) =>
         {
             try
@@ -87,11 +99,15 @@ public class CharacterMovement : MonoBehaviour
                 JObject json = (JObject)arr[0];
                 string victimId = json["victimId"]?.ToString();
                 string killerId = json["killerId"]?.ToString();
+
                 MainThreadDispatcher.Enqueue(() =>
                 {
+                    Debug.Log($"[죽음 등록] {victimId} added to DeadPlayerIds");
+
                     if (victimId == myId)
                     {
                         isDead = true;
+                        DeadPlayerIds.Add(myId);
                         GameObject panelInstance = Instantiate(DeadPanelPrefab, Vector3.zero, Quaternion.identity);
                         Destroy(panelInstance, seconds);
                         StartCoroutine(SetKillCooldown());
@@ -102,14 +118,9 @@ public class CharacterMovement : MonoBehaviour
                         if (WaitingRoomController.otherPlayers.TryGetValue(victimId, out GameObject victimGo))
                         {
                             var animCtrl = victimGo.GetComponent<CharacterAnimatorController>();
-                            if (animCtrl != null)
-                            {
-                                animCtrl.SetDead();
-                            }
-                            else
-                            {
-                                Debug.LogWarning("상대방 CharacterMovement 없음");
-                            }
+                            animCtrl?.SetDead();
+
+                            DeadPlayerIds.Add(victimId);
 
                             GameObject panelInstance = Instantiate(DeadPanelPrefab, victimGo.transform.position, Quaternion.identity);
                             Destroy(panelInstance, seconds);
@@ -142,7 +153,6 @@ public class CharacterMovement : MonoBehaviour
 
         rb.MovePosition(moveDir);
         
-        // ✅ 왼쪽/오른쪽 이동 방향에 따라 flip 처리
         if (horizontal < 0)
         {
             spriteRenderer.flipX = true;
@@ -198,18 +208,15 @@ public class CharacterMovement : MonoBehaviour
         animator.SetBool("Dead", true);
         
         HungerSystem hunger = GetComponent<HungerSystem>();
-        if (hunger != null)
-        {
-            hunger.Kill();  // ➕ 이거!
-        }
-        
+        hunger?.Kill();
+
         if (killButton != null)
         {
             killButton.interactable = false;
         }
         if (killButtonText != null)
         {
-            killButtonText.text = null; // ✅ 죽으면 즉시 텍스트 비우기
+            killButtonText.text = null; 
         }
     }
     
@@ -308,5 +315,68 @@ public class CharacterMovement : MonoBehaviour
     public void SetMovementSpeed(float newSpeed)
     {
         moveSpeed = newSpeed;
+    }
+
+    public bool GetFlipX()
+    {
+        return spriteRenderer.flipX;
+    }
+
+    void OnEatButtonClicked()
+    {
+        GameObject corpse = FindClosestDeadBody();
+        if (corpse != null)
+        {
+            var identifier = corpse.GetComponent<NetworkPlayerIdentifier>();
+            if (identifier != null && !string.IsNullOrEmpty(identifier.playerId))
+            {
+                // ✅ 서버에 시체 먹기 알림
+                NetworkManager.Instance.socket.Emit("eatCorpse", new
+                {
+                    targetId = identifier.playerId
+                });
+            }
+
+            Destroy(corpse);
+
+            HungerSystem hunger = GetComponent<HungerSystem>();
+            if (hunger != null)
+            {
+                hunger.Eat(hungerRecovery);
+            }
+
+            Debug.Log("시체를 먹었습니다!");
+        }
+        else
+        {
+            Debug.Log("근처에 먹을 수 있는 시체가 없습니다.");
+        }
+    }
+
+    private GameObject FindClosestDeadBody()
+    {
+        float minDist = float.MaxValue;
+        GameObject closest = null;
+
+        foreach (var kvp in WaitingRoomController.otherPlayers)
+        {
+            string otherId = kvp.Key;
+            GameObject other = kvp.Value;
+            if (other == null) continue;
+            if (!DeadPlayerIds.Contains(otherId)) continue;
+            float dist = Vector2.Distance(transform.position, other.transform.position);
+            if (dist < eatRange && dist < minDist)
+            {
+                minDist = dist;
+                closest = other;
+            }
+        }
+
+        return closest;
+    }
+
+    public bool IsDead()
+    {
+        return isDead;
     }
 }

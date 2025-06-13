@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TextCore.Text;
 using UnityEngine.UI;
+using static UnityEngine.GraphicsBuffer;
 
 public class WaitingRoomController : MonoBehaviour
 {
@@ -17,71 +18,75 @@ public class WaitingRoomController : MonoBehaviour
     [Header("UI Elements")]
     public TMP_Text playerCountText;   // 방 인원 수 표시용 텍스트
     public Button startGameButton;     // 게임 시작 버튼
-    public Button leaveRoomButton; //방 나가기 버튼
+    public Button leaveRoomButton;     // 방 나가기 버튼
 
     private int currentPlayers = 0;
     private int maxPlayers = 0;
-    
+
     void Start()
     {
-        // 1. 내 캐릭터 생성
+        // 내 캐릭터 생성
         Vector3 spawnPos = new Vector3(Random.Range(-3f, 3f), 0, Random.Range(-3f, 3f));
         myCharacter = Instantiate(myCharacterPrefab, spawnPos, Quaternion.identity);
 
-        // ✅ 생성 직후 카메라에 타겟 설정
         FollowCamera followCam = Camera.main.GetComponent<FollowCamera>();
         if (followCam != null)
         {
             followCam.SetTarget(myCharacter.transform);
         }
+
         
-        //2.서버에 "move" 이벤트 등록
+
+        // 다른 플레이어의 이동 정보 수신
         NetworkManager.Instance.socket.On("move", (data) =>
-         {
-             try
-             {
-                 JArray arr = JArray.Parse(data.ToString());
-                 if (arr.Count == 0) return;
+        {
+            try
+            {
+                JArray arr = JArray.Parse(data.ToString());
+                if (arr.Count == 0) return;
 
-                 JObject json = (JObject)arr[0];
+                JObject json = (JObject)arr[0];
 
-                 string id = json["id"]?.ToString();
-                 float x = json["x"]?.ToObject<float>() ?? 0;
-                 float y = json["y"]?.ToObject<float>() ?? 0;
+                string id = json["id"]?.ToString();
+                float x = json["x"]?.ToObject<float>() ?? 0;
+                float y = json["y"]?.ToObject<float>() ?? 0;
+                bool flipX = json["flipX"]?.ToObject<bool>() ?? false;
 
-                 string myId = NetworkManager.Instance.socket.Id;
-                 if (id == myId) return;
+                string myId = NetworkManager.Instance.socket.Id;
+                if (id == myId) return;
 
-                 MainThreadDispatcher.Enqueue(() =>
-                 {
-                     if (!otherPlayers.ContainsKey(id))
-                     {
-                         GameObject other = Instantiate(otherCharacterPrefab, Vector3.zero, Quaternion.identity);
-                         var identifier = other.GetComponent<NetworkPlayerIdentifier>();
-                         if (identifier != null)
-                         {
-                             identifier.playerId = id;
-                             Debug.Log("id : " + id);
-                             Debug.Log("indentifier id : " + identifier.playerId);
-                         }
-                         otherPlayers[id] = other;
-                         Debug.Log($"🟢 상대 캐릭터 생성: {id}");
-                     }
-                     
-                     otherPlayers[id].transform.position = new Vector3(x, y, 0);
-                 });
-             }
-             catch (System.Exception ex)
-             {
-                 Debug.LogError("❌ move 이벤트 파싱 실패: " + ex.Message);
-             }
-         });
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (!otherPlayers.ContainsKey(id))
+                    {
+                        GameObject other = Instantiate(otherCharacterPrefab, Vector3.zero, Quaternion.identity);
+                        var identifier = other.GetComponent<NetworkPlayerIdentifier>();
+                        if (identifier != null)
+                        {
+                            identifier.playerId = id;
+                        }
+                        otherPlayers[id] = other;
+                    }
 
-        // 3. 이동 시작 (예: 키 입력으로 move 이벤트 emit)
+                    otherPlayers[id].transform.position = new Vector3(x, y, 0);
+
+                    var sr = otherPlayers[id].GetComponent<SpriteRenderer>();
+                    if (sr != null)
+                    {
+                        sr.flipX = flipX;
+                    }
+                });
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("❌ move 이벤트 파싱 실패: " + ex.Message);
+            }
+        });
+
+        // 내 위치 주기적 전송
         StartCoroutine(SendMoveLoop());
 
-
-        // 현재 방 인원 요청 및 UI 업데이트
+        // 방 인원 요청
         NetworkManager.Instance.socket.Emit("getRoomPlayerCount");
         NetworkManager.Instance.socket.On("roomPlayerCount", (data) =>
         {
@@ -100,25 +105,59 @@ public class WaitingRoomController : MonoBehaviour
             catch (System.Exception ex)
             {
                 Debug.LogError("❌ roomPlayerCount 파싱 실패: " + ex.Message);
-                Debug.LogError("받은 원본 데이터: " + data);
             }
         });
 
-        // 게임 시작 버튼 이벤트 등록
+        // 게임 시작 버튼: 기본 비활성화
+        startGameButton.gameObject.SetActive(false);
+
+        string hostId = NetworkManager.Instance.HostId;
+        bool isHost = hostId == NetworkManager.Instance.socket.Id;
+        startGameButton.gameObject.SetActive(isHost);
+        Debug.Log($"[WaitingRoomController] 내 ID: {NetworkManager.Instance.socket.Id}, 방장 ID: {hostId}, 방장 여부: {isHost}");
+        // 게임 시작 버튼 클릭 이벤트
         startGameButton.onClick.AddListener(OnStartGameClicked);
 
-        // 게임 시작 이벤트 리스너
+        // 방 나가기 버튼
+        leaveRoomButton.onClick.AddListener(OnLeaveRoomClicked);
+
+        // 게임 시작 이벤트 수신
         NetworkManager.Instance.socket.On("gameStarted", (_) =>
         {
             MainThreadDispatcher.Enqueue(() =>
             {
                 Debug.Log("게임 시작됨!");
-                SceneManager.LoadScene("Game"); // 게임 씬으로 이동
+                SceneManager.LoadScene("Game");
             });
         });
 
-        // 방 나가기 버튼 이벤트 등록
-        leaveRoomButton.onClick.AddListener(OnLeaveRoomClicked);
+        // 방 참가 시 방장 정보 수신 → 버튼 제어
+        NetworkManager.Instance.socket.On("joinedRoom", (data) =>
+        {
+            JObject json = JObject.Parse(data.ToString());
+            string hostId = json["hostId"]?.ToString();
+            NetworkManager.Instance.SetHostId(hostId);
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                bool isHost = (hostId == NetworkManager.Instance.socket.Id);
+                startGameButton.gameObject.SetActive(isHost);
+            });
+        });
+
+        // 방장 변경 시 버튼 갱신
+        NetworkManager.Instance.socket.On("hostChanged", (data) =>
+        {
+            JObject json = JObject.Parse(data.ToString());
+            string newHostId = json["hostId"]?.ToString();
+            NetworkManager.Instance.SetHostId(newHostId);
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                bool isHost = (newHostId == NetworkManager.Instance.socket.Id);
+                startGameButton.gameObject.SetActive(isHost);
+            });
+        });
     }
 
     private void UpdatePlayerCountUI()
@@ -137,11 +176,10 @@ public class WaitingRoomController : MonoBehaviour
 
         NetworkManager.Instance.socket.Emit("leaveRoom", new
         {
-            roomId = NetworkManager.Instance.socket.Id // 또는 저장해 둔 roomId
+            roomId = NetworkManager.Instance.socket.Id
         });
 
-        // 클라이언트가 먼저 씬을 나가도 괜찮음 (서버는 나중에 처리됨)
-        SceneManager.LoadScene("Main"); // 또는 로비 씬 이름
+        SceneManager.LoadScene("Main");
     }
 
     IEnumerator SendMoveLoop()
@@ -149,11 +187,13 @@ public class WaitingRoomController : MonoBehaviour
         while (true)
         {
             var pos = myCharacter.transform.position;
+            bool flipX = myCharacter.GetComponent<CharacterMovement>().GetFlipX();
 
             NetworkManager.Instance.socket.Emit("move", new
             {
                 x = pos.x,
-                y = pos.y
+                y = pos.y,
+                flipX = flipX
             });
 
             yield return new WaitForSeconds(0.1f); // 10fps
