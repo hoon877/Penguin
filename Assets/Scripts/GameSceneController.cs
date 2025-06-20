@@ -1,29 +1,37 @@
 using System.Collections;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
+using TMPro;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
 public class GameSceneController : MonoBehaviour
 {
+    [SerializeField] private TMP_Text spectatorHintText;
+
     public GameObject myCharacterPrefab;
     public GameObject otherCharacterPrefab;
     private GameObject myCharacter;
 
+    private List<string> aliveSpectateIds = new List<string>();
+    private int currentSpectateIndex = 0;
+    private bool isSpectating = false;
+
     void Start()
     {
-        // 1. 내 캐릭터 생성
+        if (spectatorHintText != null)
+            spectatorHintText.gameObject.SetActive(false);
+
         Vector3 spawnPos = new Vector3(Random.Range(-3f, 3f), 0, Random.Range(-3f, 3f));
+
         myCharacter = Instantiate(myCharacterPrefab, spawnPos, Quaternion.identity);
 
-        // ✅ 생성 직후 카메라에 타겟 설정
         FollowCamera followCam = Camera.main.GetComponent<FollowCamera>();
         if (followCam != null)
         {
             followCam.SetTarget(myCharacter.transform);
         }
 
-        //2.서버에 "move" 이벤트 등록
         NetworkManager.Instance.socket.On("move", (data) =>
         {
             try
@@ -61,7 +69,7 @@ public class GameSceneController : MonoBehaviour
                         }
 
                         WaitingRoomController.otherPlayers[id] = other;
-                        Debug.Log($"🟢 상대 캐릭터 생성: {id}");
+                        Debug.Log($" 상대 캐릭터 생성: {id}");
                     }
 
                     WaitingRoomController.otherPlayers[id].transform.position = new Vector3(x, y, 0);
@@ -75,41 +83,10 @@ public class GameSceneController : MonoBehaviour
             }
             catch (System.Exception ex)
             {
-                Debug.LogError("❌ move 이벤트 파싱 실패: " + ex.Message);
+                Debug.LogError(" move 이벤트 파싱 실패: " + ex.Message);
             }
         });
 
-        NetworkManager.Instance.socket.On("corpseEaten", (data) =>
-        {
-            try
-            {
-                JArray arr = JArray.Parse(data.ToString());
-                if (arr.Count == 0) return;
-
-                JObject json = (JObject)arr[0];
-                string targetId = json["targetId"]?.ToString();
-
-                if (string.IsNullOrEmpty(targetId)) return;
-
-                MainThreadDispatcher.Enqueue(() =>
-                {
-                    if (WaitingRoomController.otherPlayers.TryGetValue(targetId, out GameObject corpse))
-                    {
-                        Destroy(corpse);
-                        WaitingRoomController.otherPlayers.Remove(targetId);
-                        CharacterMovement.DeadPlayerIds.Remove(targetId);
-
-                        Debug.Log($"[동기화] 시체 제거됨: {targetId}");
-                    }
-                });
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError("corpseEaten 이벤트 파싱 실패: " + ex.Message);
-            }
-        });
-
-        // 3. 이동 시작 (예: 키 입력으로 move 이벤트 emit)
         StartCoroutine(SendMoveLoop());
     }
     
@@ -117,6 +94,7 @@ public class GameSceneController : MonoBehaviour
     {
         while (true)
         {
+            if (myCharacter == null) yield break;
             var pos = myCharacter.transform.position;
             bool flipX = myCharacter.GetComponent<CharacterMovement>().GetFlipX();
 
@@ -128,6 +106,57 @@ public class GameSceneController : MonoBehaviour
             });
 
             yield return new WaitForSeconds(0.1f); // 10fps
+        }
+    }
+
+    void Update()
+    {
+        if (!isSpectating) return;
+
+        if (Input.GetKeyDown(KeyCode.RightArrow))
+        {
+            CycleSpectate(1);
+        }
+        else if (Input.GetKeyDown(KeyCode.LeftArrow))
+        {
+            CycleSpectate(-1);
+        }
+    }
+
+    public void SetSpectatorMode()
+    {
+        aliveSpectateIds.Clear();
+        foreach (var kvp in WaitingRoomController.otherPlayers)
+        {
+            if (!CharacterMovement.DeadPlayerIds.Contains(kvp.Key))
+                aliveSpectateIds.Add(kvp.Key);
+        }
+
+        if (aliveSpectateIds.Count == 0) return;
+
+        currentSpectateIndex = 0;
+        isSpectating = true;
+        SetSpectateTarget(aliveSpectateIds[currentSpectateIndex]);
+
+        if (spectatorHintText != null)
+            spectatorHintText.gameObject.SetActive(true);
+    }
+
+    private void CycleSpectate(int delta)
+    {
+        if (aliveSpectateIds.Count == 0) return;
+
+        currentSpectateIndex = (currentSpectateIndex + delta + aliveSpectateIds.Count) % aliveSpectateIds.Count;
+        SetSpectateTarget(aliveSpectateIds[currentSpectateIndex]);
+    }
+
+    private void SetSpectateTarget(string id)
+    {
+        if (WaitingRoomController.otherPlayers.TryGetValue(id, out GameObject target))
+        {
+            var cam = Camera.main.GetComponent<FollowCamera>();
+            cam?.SetTarget(target.transform);
+            Debug.Log($" 관전 시점 전환: {id}");
         }
     }
 }

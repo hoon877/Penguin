@@ -8,7 +8,11 @@ public class FollowCamera : MonoBehaviour
 
     void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null)
+        {
+            Debug.LogWarning("📷 FollowCamera: target이 null입니다.");
+            return;
+        }
 
         Vector3 desiredPosition = target.position + offset;
         Vector3 smoothedPosition = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed * Time.deltaTime);
@@ -19,5 +23,12 @@ public class FollowCamera : MonoBehaviour
     public void SetTarget(Transform newTarget)
     {
         target = newTarget;
+        Debug.Log($"📷 FollowCamera 타겟 변경됨: {target?.name}");
+    }
+
+    public void SnapToTarget()
+    {
+        if (target == null) return;
+        transform.position = target.position + offset;
     }
 }

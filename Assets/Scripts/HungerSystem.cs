@@ -51,6 +51,7 @@ public class HungerSystem : MonoBehaviour
             GetComponent<CharacterMovement>()?.SetDead();
             uiController?.StopBlink();
             isAlive = false;
+            NetworkManager.Instance.socket.Emit("hungerDeath", new { playerId = NetworkManager.Instance.socket.Id });
         }
     }
 

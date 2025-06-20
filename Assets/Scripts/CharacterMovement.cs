@@ -18,6 +18,17 @@ public class CharacterMovement : MonoBehaviour
     [SerializeField] private float hungerRecovery = 30f;
     private Button eatButton;
 
+    [SerializeField] private string fishingLayerName = "Fishing";
+    [SerializeField] private float fishingCooldown = 60f;
+
+    private int fishingLayer;
+    private bool isOnFishingTile = false;
+    private bool isFishingCooldown = false;
+    private bool isFishing = false;
+    private Button fishingButton;
+    private TMP_Text fishingCooldownText;
+    [SerializeField] private GameObject FishingPanelPrefab;
+
     private string myId;
     private Vector2 moveDir;
     private Rigidbody2D rb;
@@ -57,6 +68,17 @@ public class CharacterMovement : MonoBehaviour
             killButtonText = GameObject.Find("KillButtonText")?.GetComponent<TMP_Text>();
 
             eatButton = GameObject.Find("EatButton")?.GetComponent<Button>();
+
+            fishingButton = GameObject.Find("FishingButton")?.GetComponent<Button>();
+            fishingCooldownText = GameObject.Find("FishingCooldownText")?.GetComponent<TMP_Text>();
+
+            if (fishingButton != null)
+            {
+                fishingButton.onClick.AddListener(OnFishingButtonClicked);
+            }
+            fishingLayer = LayerMask.NameToLayer(fishingLayerName);
+            if (fishingLayer == -1)
+                Debug.LogError("Fishing 레이어가 정의되어 있지 않습니다!");
 
             if (eatButton != null)
                 eatButton.onClick.AddListener(OnEatButtonClicked);
@@ -108,8 +130,11 @@ public class CharacterMovement : MonoBehaviour
                     {
                         isDead = true;
                         DeadPlayerIds.Add(myId);
-                        GameObject panelInstance = Instantiate(DeadPanelPrefab, Vector3.zero, Quaternion.identity);
-                        Destroy(panelInstance, seconds);
+                        if (!string.IsNullOrEmpty(killerId))
+                        {
+                            GameObject panelInstance = Instantiate(DeadPanelPrefab, Vector3.zero, Quaternion.identity);
+                            Destroy(panelInstance, seconds);
+                        }
                         StartCoroutine(SetKillCooldown());
                         SetDead();
                     }
@@ -121,9 +146,6 @@ public class CharacterMovement : MonoBehaviour
                             animCtrl?.SetDead();
 
                             DeadPlayerIds.Add(victimId);
-
-                            GameObject panelInstance = Instantiate(DeadPanelPrefab, victimGo.transform.position, Quaternion.identity);
-                            Destroy(panelInstance, seconds);
                         }
                     }
                 });
@@ -133,11 +155,52 @@ public class CharacterMovement : MonoBehaviour
                 Debug.LogError("killed 파싱 실패: " + ex.Message);
             }
         });
+
+        NetworkManager.Instance.socket.On("corpseEaten", (data) =>
+        {
+            try
+            {
+                JArray arr = JArray.Parse(data.ToString());
+                if (arr.Count == 0) return;
+
+                JObject json = (JObject)arr[0];
+                string targetId = json["targetId"]?.ToString();
+                if (string.IsNullOrEmpty(targetId)) return;
+
+                MainThreadDispatcher.Enqueue(() =>
+                {
+
+                    // 1. 내가 먹힌 시체라면 내 오브젝트 삭제
+                    if (targetId == myId)
+                    {
+                        Debug.Log($"🟥 내가 먹힘. 내 시체 제거됨: {targetId}");
+                        CharacterMovement.DeadPlayerIds.Remove(targetId);
+                        Destroy(gameObject); // 내 시점에서 스스로 제거
+                        
+                        return;
+                    }
+
+                    // 2. 상대방이면 otherPlayers에서 제거
+                    if (WaitingRoomController.otherPlayers.TryGetValue(targetId, out GameObject corpse))
+                    {
+                        Destroy(corpse);
+                        WaitingRoomController.otherPlayers.Remove(targetId);
+                        CharacterMovement.DeadPlayerIds.Remove(targetId);
+                        Debug.Log($"[동기화] 시체 제거됨: {targetId}");
+                    }
+
+                });
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("corpseEaten 이벤트 파싱 실패: " + ex.Message);
+            }
+        });
     }
 
     private void FixedUpdate()
     {
-        if (!isDead && !isKill)
+        if (!isDead && !isKill && !isFishing)
         {
             Move();
         }
@@ -173,6 +236,8 @@ public class CharacterMovement : MonoBehaviour
         {
             animator.SetBool("Walk", false);
         }
+        if(isKillableScene)
+            fishingButton.interactable = !isDead && isOnFishingTile && !isFishingCooldown;
     }
 
     private GameObject FindClosestKillableTarget()
@@ -218,6 +283,12 @@ public class CharacterMovement : MonoBehaviour
         {
             killButtonText.text = null; 
         }
+
+        var gsc = FindObjectOfType<GameSceneController>();
+        if (gsc != null)
+        {
+            gsc.SetSpectatorMode();
+        }
     }
     
     IEnumerator KillCooldownRoutine()
@@ -253,7 +324,7 @@ public class CharacterMovement : MonoBehaviour
     
     private void OnKillButtonClicked()
     {
-        if (!canKill) return; // 아직 킬 불가
+        if (!canKill) return; 
 
         GameObject closest = FindClosestKillableTarget();
         if (closest == null) return;
@@ -272,7 +343,6 @@ public class CharacterMovement : MonoBehaviour
     
     IEnumerator RestartKillCooldown()
     {
-        // 즉시 버튼 비활성화
         if (killButton != null)
         {
             killButton.interactable = false;
@@ -282,7 +352,7 @@ public class CharacterMovement : MonoBehaviour
             killButtonText.text = $"{Mathf.CeilToInt(killCooldown)}초";
         }
 
-        canKill = false; // 다시 쿨다운 시작
+        canKill = false; 
         float remainingTime = killCooldown;
 
         while (remainingTime > 0f)
@@ -330,7 +400,6 @@ public class CharacterMovement : MonoBehaviour
             var identifier = corpse.GetComponent<NetworkPlayerIdentifier>();
             if (identifier != null && !string.IsNullOrEmpty(identifier.playerId))
             {
-                // ✅ 서버에 시체 먹기 알림
                 NetworkManager.Instance.socket.Emit("eatCorpse", new
                 {
                     targetId = identifier.playerId
@@ -378,5 +447,97 @@ public class CharacterMovement : MonoBehaviour
     public bool IsDead()
     {
         return isDead;
+    }
+
+    void OnFishingButtonClicked()
+    {
+        if (isDead || isFishing || isFishingCooldown || !isOnFishingTile)
+        {
+            Debug.Log("낚시할 수 없는 상태입니다.");
+            return;
+        }
+
+        isFishing = true; // 이동 금지 플래그
+
+        GameObject FishingPanel = Instantiate(FishingPanelPrefab, Vector3.zero, Quaternion.identity);
+        TMP_Text resultText = FishingPanel.transform.Find("FishingPanel/FishingText")?.GetComponent<TMP_Text>();
+
+        if (resultText != null)
+        {
+            resultText.gameObject.SetActive(false); // 시작 시 숨기기
+        }
+
+        StartCoroutine(StartFishingCooldown());
+
+        StartCoroutine(FinishFishingAfterDelay(3f, FishingPanel, resultText));
+
+        Debug.Log(" 낚시 시작!");
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.gameObject.layer == fishingLayer)
+        {
+            isOnFishingTile = true;
+            Debug.Log("낚시 가능한 지역에 진입했습니다.");
+        }
+    }
+
+    private void OnTriggerExit2D(Collider2D other)
+    {
+        if (other.gameObject.layer == fishingLayer)
+        {
+            isOnFishingTile = false;
+            Debug.Log("낚시 가능한 지역에서 벗어났습니다.");
+        }
+    }
+
+    private IEnumerator StartFishingCooldown()
+    {
+        isFishingCooldown = true;
+        float remainingTime = fishingCooldown;
+
+        while (remainingTime > 0f)
+        {
+            if (fishingCooldownText != null)
+            {
+                fishingCooldownText.text = $"{Mathf.CeilToInt(remainingTime)}초";
+            }
+
+            yield return new WaitForSeconds(1f);
+            remainingTime -= 1f;
+        }
+
+        isFishingCooldown = false;
+        if (fishingCooldownText != null)
+        {
+            fishingCooldownText.text = ""; // 쿨타임 종료 시 텍스트 초기화
+        }
+        Debug.Log("쿨타임 종료: 다시 낚시할 수 있습니다.");
+    }
+
+    private IEnumerator FinishFishingAfterDelay(float delay, GameObject panel, TMP_Text resultText)
+    {
+        yield return new WaitForSeconds(delay);
+
+        
+        HungerSystem hunger = GetComponent<HungerSystem>();
+        hunger?.Eat(10);
+
+        isFishing = false;
+
+        if (resultText != null)
+        {
+            resultText.gameObject.SetActive(true);
+        }
+
+        yield return new WaitForSeconds(1f); // 결과 보여준 후
+
+        if (panel != null)
+        {
+            Destroy(panel);
+        }
+
+        Debug.Log(" 낚시 종료: 배고픔 +10");
     }
 }

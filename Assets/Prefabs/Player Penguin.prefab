@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 3048261784134293228}
   - component: {fileID: 4576516478409555665}
   - component: {fileID: 1290367740891900863}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Player Penguin
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -166,6 +166,11 @@ MonoBehaviour:
   DeadPanelPrefab: {fileID: 3400582959984163587, guid: 2dd18c42403cb8a4a8b3e108987369ff, type: 3}
   moveSpeed: 5
   killRange: 4
+  eatRange: 4
+  hungerRecovery: 30
+  fishingLayerName: Fishing
+  fishingCooldown: 60
+  FishingPanelPrefab: {fileID: 7011286915219479261, guid: 9ecf916227d8cfb4e811a0bcf4b98aef, type: 3}
 --- !u!95 &4576516478409555665
 Animator:
   serializedVersion: 5
