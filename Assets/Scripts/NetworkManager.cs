@@ -11,6 +11,8 @@ public class NetworkManager : Singleton<NetworkManager>
 
     public string HostId { get; private set; }
 
+    public string AssignedRoleRaw { get; set; } = null;
+
     private void Start()
     {
         DontDestroyOnLoad(this.gameObject);

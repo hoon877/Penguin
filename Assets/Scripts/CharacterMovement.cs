@@ -6,6 +6,11 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
+public enum PlayerRole
+{
+    Crew,
+    Imposter
+}
 public class CharacterMovement : MonoBehaviour
 {
     public static HashSet<string> DeadPlayerIds = new HashSet<string>();
@@ -35,19 +40,22 @@ public class CharacterMovement : MonoBehaviour
     private Animator animator;
     private SpriteRenderer spriteRenderer;
     
-    float vertical;
-    float horizontal;
-    bool isDead = false;
-    bool isKill = false;
-    float seconds = 1f;
+    private float vertical;
+    private float horizontal;
+    private bool isDead = false;
+    private float seconds = 1f;
+    private bool killUsed = false;
     private bool canKill = false; // 처음에는 Kill 불가
+    private PlayerRole myRole = PlayerRole.Crew;
     private bool isKillableScene = false;
     private string currentSceneName;
-    
+    private bool uiReady = false;
+
     private Button killButton;
     private TMP_Text killButtonText;
     
     private float killCooldown = 30f;
+    private string assignedRoleRaw = null;
 
     private void Awake()
     {
@@ -60,10 +68,34 @@ public class CharacterMovement : MonoBehaviour
     void Start()
     {
 
+        NetworkManager.Instance.socket.On("assignRole", response =>
+        {
+            try
+            {
+                JArray arr = JArray.Parse(response.ToString());
+                if (arr.Count == 0) return;
+
+                JObject json = (JObject)arr[0];
+                string role = json["role"]?.ToString();
+                myRole = role == "Imposter" ? PlayerRole.Imposter : PlayerRole.Crew;
+                NetworkManager.Instance.AssignedRoleRaw = role;
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    Debug.Log("내 역할: " + myRole);
+                    Debug.Log("할당된 역할: " + NetworkManager.Instance.AssignedRoleRaw);
+                });
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("assignRole 파싱 실패: " + ex.Message);
+            }
+        });
+
         currentSceneName = SceneManager.GetActiveScene().name;
         isKillableScene = currentSceneName == "Game";
         if (isKillableScene)
         {
+            
             killButton = GameObject.Find("KillButton")?.GetComponent<Button>();
             killButtonText = GameObject.Find("KillButtonText")?.GetComponent<TMP_Text>();
 
@@ -71,6 +103,8 @@ public class CharacterMovement : MonoBehaviour
 
             fishingButton = GameObject.Find("FishingButton")?.GetComponent<Button>();
             fishingCooldownText = GameObject.Find("FishingCooldownText")?.GetComponent<TMP_Text>();
+
+            uiReady = true;
 
             if (fishingButton != null)
             {
@@ -196,11 +230,32 @@ public class CharacterMovement : MonoBehaviour
                 Debug.LogError("corpseEaten 이벤트 파싱 실패: " + ex.Message);
             }
         });
+
+        StartCoroutine(ApplyRoleWhenReady());
+    }
+
+    
+    private IEnumerator ApplyRoleWhenReady()
+    {
+        // 대기: 역할 수신과 UI 모두 준비될 때까지
+        Debug.Log("assignedRoleRaw : " + assignedRoleRaw);
+        Debug.Log("uiReady : " + uiReady);
+        while (NetworkManager.Instance.AssignedRoleRaw == null || !uiReady)
+        {
+            yield return null;
+        }
+
+        myRole = NetworkManager.Instance.AssignedRoleRaw == "Imposter" ? PlayerRole.Imposter : PlayerRole.Crew;
+
+        Debug.Log("🟢 역할 UI 반영 시작: " + myRole);
+
+        eatButton?.gameObject.SetActive(myRole == PlayerRole.Imposter);
+        fishingButton?.gameObject.SetActive(myRole == PlayerRole.Crew);
     }
 
     private void FixedUpdate()
     {
-        if (!isDead && !isKill && !isFishing)
+        if (!isDead && !isFishing)
         {
             Move();
         }
@@ -236,8 +291,6 @@ public class CharacterMovement : MonoBehaviour
         {
             animator.SetBool("Walk", false);
         }
-        if(isKillableScene)
-            fishingButton.interactable = !isDead && isOnFishingTile && !isFishingCooldown;
     }
 
     private GameObject FindClosestKillableTarget()
@@ -264,7 +317,6 @@ public class CharacterMovement : MonoBehaviour
     IEnumerator SetKillCooldown()
     {
         yield return new WaitForSeconds(seconds);
-        isKill = false;
     }
     
     public void SetDead()
@@ -324,7 +376,14 @@ public class CharacterMovement : MonoBehaviour
     
     private void OnKillButtonClicked()
     {
-        if (!canKill) return; 
+        if (myRole == PlayerRole.Crew)
+        {
+            if (killUsed) return;
+            killUsed = true;
+            killButton.interactable = false;
+        }
+
+        if (myRole == PlayerRole.Imposter && !canKill) return;
 
         GameObject closest = FindClosestKillableTarget();
         if (closest == null) return;
@@ -332,13 +391,14 @@ public class CharacterMovement : MonoBehaviour
         var identifier = closest.GetComponent<NetworkPlayerIdentifier>();
         if (identifier == null || string.IsNullOrEmpty(identifier.playerId)) return;
 
-        isKill = true;
         StartCoroutine(SetKillCooldown());
-
         string targetId = identifier.playerId;
         NetworkManager.Instance.socket.Emit("kill", new { targetId });
-        
-        StartCoroutine(RestartKillCooldown());
+
+        if (myRole == PlayerRole.Imposter)
+        {
+            StartCoroutine(RestartKillCooldown());
+        }
     }
     
     IEnumerator RestartKillCooldown()
@@ -394,6 +454,8 @@ public class CharacterMovement : MonoBehaviour
 
     void OnEatButtonClicked()
     {
+        if (myRole != PlayerRole.Imposter) return;
+
         GameObject corpse = FindClosestDeadBody();
         if (corpse != null)
         {
@@ -502,6 +564,7 @@ public class CharacterMovement : MonoBehaviour
             if (fishingCooldownText != null)
             {
                 fishingCooldownText.text = $"{Mathf.CeilToInt(remainingTime)}초";
+                fishingButton.interactable = false; // 쿨타임 동안 버튼 비활성화
             }
 
             yield return new WaitForSeconds(1f);
