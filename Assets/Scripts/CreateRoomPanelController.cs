@@ -35,9 +35,8 @@ public class CreateRoomPanelController : MonoBehaviour
             if (roomDataArray.items.Length > 0)
             {
                 _roomId = roomDataArray.items[0].roomId;
-                Debug.Log("새로운 방 생성됨: " + _roomId);
 
-                // ✅ 방장 ID는 현재 소켓 ID
+                // 방장 ID는 현재 소켓 ID
                 string myId = NetworkManager.Instance.socket.Id;
                 NetworkManager.Instance.SetHostId(myId);
             }

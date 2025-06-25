@@ -55,7 +55,6 @@ public class CharacterMovement : MonoBehaviour
     private TMP_Text killButtonText;
     
     private float killCooldown = 30f;
-    private string assignedRoleRaw = null;
 
     private void Awake()
     {
@@ -79,11 +78,6 @@ public class CharacterMovement : MonoBehaviour
                 string role = json["role"]?.ToString();
                 myRole = role == "Imposter" ? PlayerRole.Imposter : PlayerRole.Crew;
                 NetworkManager.Instance.AssignedRoleRaw = role;
-                MainThreadDispatcher.Enqueue(() =>
-                {
-                    Debug.Log("내 역할: " + myRole);
-                    Debug.Log("할당된 역할: " + NetworkManager.Instance.AssignedRoleRaw);
-                });
             }
             catch (System.Exception ex)
             {
@@ -158,8 +152,6 @@ public class CharacterMovement : MonoBehaviour
 
                 MainThreadDispatcher.Enqueue(() =>
                 {
-                    Debug.Log($"[죽음 등록] {victimId} added to DeadPlayerIds");
-
                     if (victimId == myId)
                     {
                         isDead = true;
@@ -207,7 +199,6 @@ public class CharacterMovement : MonoBehaviour
                     // 1. 내가 먹힌 시체라면 내 오브젝트 삭제
                     if (targetId == myId)
                     {
-                        Debug.Log($"🟥 내가 먹힘. 내 시체 제거됨: {targetId}");
                         CharacterMovement.DeadPlayerIds.Remove(targetId);
                         Destroy(gameObject); // 내 시점에서 스스로 제거
                         
@@ -220,7 +211,6 @@ public class CharacterMovement : MonoBehaviour
                         Destroy(corpse);
                         WaitingRoomController.otherPlayers.Remove(targetId);
                         CharacterMovement.DeadPlayerIds.Remove(targetId);
-                        Debug.Log($"[동기화] 시체 제거됨: {targetId}");
                     }
 
                 });
@@ -237,17 +227,12 @@ public class CharacterMovement : MonoBehaviour
     
     private IEnumerator ApplyRoleWhenReady()
     {
-        // 대기: 역할 수신과 UI 모두 준비될 때까지
-        Debug.Log("assignedRoleRaw : " + assignedRoleRaw);
-        Debug.Log("uiReady : " + uiReady);
         while (NetworkManager.Instance.AssignedRoleRaw == null || !uiReady)
         {
             yield return null;
         }
 
         myRole = NetworkManager.Instance.AssignedRoleRaw == "Imposter" ? PlayerRole.Imposter : PlayerRole.Crew;
-
-        Debug.Log("🟢 역할 UI 반영 시작: " + myRole);
 
         eatButton?.gameObject.SetActive(myRole == PlayerRole.Imposter);
         fishingButton?.gameObject.SetActive(myRole == PlayerRole.Crew);
@@ -475,12 +460,9 @@ public class CharacterMovement : MonoBehaviour
             {
                 hunger.Eat(hungerRecovery);
             }
-
-            Debug.Log("시체를 먹었습니다!");
         }
         else
         {
-            Debug.Log("근처에 먹을 수 있는 시체가 없습니다.");
         }
     }
 
@@ -515,7 +497,6 @@ public class CharacterMovement : MonoBehaviour
     {
         if (isDead || isFishing || isFishingCooldown || !isOnFishingTile)
         {
-            Debug.Log("낚시할 수 없는 상태입니다.");
             return;
         }
 
@@ -532,8 +513,6 @@ public class CharacterMovement : MonoBehaviour
         StartCoroutine(StartFishingCooldown());
 
         StartCoroutine(FinishFishingAfterDelay(3f, FishingPanel, resultText));
-
-        Debug.Log(" 낚시 시작!");
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -541,7 +520,6 @@ public class CharacterMovement : MonoBehaviour
         if (other.gameObject.layer == fishingLayer)
         {
             isOnFishingTile = true;
-            Debug.Log("낚시 가능한 지역에 진입했습니다.");
         }
     }
 
@@ -550,7 +528,6 @@ public class CharacterMovement : MonoBehaviour
         if (other.gameObject.layer == fishingLayer)
         {
             isOnFishingTile = false;
-            Debug.Log("낚시 가능한 지역에서 벗어났습니다.");
         }
     }
 
@@ -572,11 +549,11 @@ public class CharacterMovement : MonoBehaviour
         }
 
         isFishingCooldown = false;
+        fishingButton.interactable = true;
         if (fishingCooldownText != null)
         {
             fishingCooldownText.text = ""; // 쿨타임 종료 시 텍스트 초기화
         }
-        Debug.Log("쿨타임 종료: 다시 낚시할 수 있습니다.");
     }
 
     private IEnumerator FinishFishingAfterDelay(float delay, GameObject panel, TMP_Text resultText)
@@ -600,7 +577,5 @@ public class CharacterMovement : MonoBehaviour
         {
             Destroy(panel);
         }
-
-        Debug.Log(" 낚시 종료: 배고픔 +10");
     }
 }

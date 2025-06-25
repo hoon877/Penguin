@@ -17,7 +17,7 @@ public class HungerUIController : MonoBehaviour
     {
         if (hungerSlider != null)
         {
-            hungerSlider.interactable = false; // 👉 사용자 조작 금지
+            hungerSlider.interactable = false;
         }
     }
     public void UpdateSlider(float normalizedValue)

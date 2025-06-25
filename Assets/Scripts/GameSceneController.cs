@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using static UnityEngine.GraphicsBuffer;
 
 public class GameSceneController : MonoBehaviour
 {
     [SerializeField] private TMP_Text spectatorHintText;
+    [SerializeField] private GameObject gameResultPanelPrefab; // 결과 UI 프리팹
+    private GameObject currentResultPanel;
 
     public GameObject myCharacterPrefab;
     public GameObject otherCharacterPrefab;
@@ -55,7 +58,6 @@ public class GameSceneController : MonoBehaviour
                     {
                         if (CharacterMovement.DeadPlayerIds.Contains(id))
                         {
-                            Debug.LogWarning($"[무시됨] {id}는 이미 먹힌 시체입니다");
                             return;
                         }
 
@@ -64,12 +66,9 @@ public class GameSceneController : MonoBehaviour
                         if (identifier != null)
                         {
                             identifier.playerId = id;
-                            Debug.Log("id : " + id);
-                            Debug.Log("indentifier id : " + identifier.playerId);
                         }
 
                         WaitingRoomController.otherPlayers[id] = other;
-                        Debug.Log($" 상대 캐릭터 생성: {id}");
                     }
 
                     WaitingRoomController.otherPlayers[id].transform.position = new Vector3(x, y, 0);
@@ -85,6 +84,21 @@ public class GameSceneController : MonoBehaviour
             {
                 Debug.LogError(" move 이벤트 파싱 실패: " + ex.Message);
             }
+        });
+
+        NetworkManager.Instance.socket.On("gameEnded", (data) =>
+        {
+            JArray arr = JArray.Parse(data.ToString());
+            if (arr.Count == 0) return;
+
+            JObject json = (JObject)arr[0];
+            string winner = json["winner"]?.ToString();
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                ShowResultPanel(winner);
+                StartCoroutine(ReturnToWaitingRoomAfterDelay(5f));
+            });
         });
 
         StartCoroutine(SendMoveLoop());
@@ -156,7 +170,37 @@ public class GameSceneController : MonoBehaviour
         {
             var cam = Camera.main.GetComponent<FollowCamera>();
             cam?.SetTarget(target.transform);
-            Debug.Log($" 관전 시점 전환: {id}");
         }
     }
+
+    private void ShowResultPanel(string winner)
+    {
+        if (gameResultPanelPrefab == null)
+        {
+            Debug.LogError("결과 패널 프리팹이 설정되지 않았습니다.");
+            return;
+        }
+
+        currentResultPanel = Instantiate(gameResultPanelPrefab, Vector3.zero, Quaternion.identity);
+        TMP_Text resultText = currentResultPanel.transform.Find("GameResultPanel/ResultText")?.GetComponent<TMP_Text>();
+
+        if (resultText != null)
+        {
+            if (winner == "Imposter")
+                resultText.text = "임포스터 승리!";
+            else if (winner == "Crew")
+                resultText.text = "일반인 승리!";
+            else
+                resultText.text = "게임 종료";
+        }
+    }
+
+    private IEnumerator ReturnToWaitingRoomAfterDelay(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+
+        // 씬 전환
+        SceneManager.LoadScene("Waiting Room");
+    }
 }
+

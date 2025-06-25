@@ -30,9 +30,8 @@ public class EnterPortalTrigger : MonoBehaviour
             if (cam != null)
             {
                 cam.SetTarget(other.transform);
-                cam.SnapToTarget(); //  즉시 이동!
+                cam.SnapToTarget(); 
             }
-            Debug.Log($" {gameObject.name} 통해 이동 -> {targetPosition}");
         }
     }
 }

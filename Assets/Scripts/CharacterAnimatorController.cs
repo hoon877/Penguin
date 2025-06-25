@@ -13,7 +13,6 @@ public class CharacterAnimatorController : MonoBehaviour
     {
         animator.SetBool("Dead", true);
         animator.SetBool("Walk", false);
-        Debug.Log($"{name}: Dead 애니메이션 실행됨");
     }
 
     public void SetWalk(bool isWalking)

@@ -10,7 +10,6 @@ public class FollowCamera : MonoBehaviour
     {
         if (target == null)
         {
-            Debug.LogWarning("📷 FollowCamera: target이 null입니다.");
             return;
         }
 
@@ -23,7 +22,6 @@ public class FollowCamera : MonoBehaviour
     public void SetTarget(Transform newTarget)
     {
         target = newTarget;
-        Debug.Log($"📷 FollowCamera 타겟 변경됨: {target?.name}");
     }
 
     public void SnapToTarget()

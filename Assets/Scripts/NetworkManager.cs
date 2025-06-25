@@ -19,18 +19,17 @@ public class NetworkManager : Singleton<NetworkManager>
 
         socket = new SocketIOUnity(Constant.GameServerURL);
         
-        socket.OnConnected += (sender, e) => { Debug.Log("connected"); };
+        socket.OnConnected += (sender, e) => {  };
 
         socket.Connect();
         
-        socket.OnDisconnected += (sender, e) => { Debug.Log("disconnect: " + e); };
+        socket.OnDisconnected += (sender, e) => { };
         
     }
 
     public void SetHostId(string hostId)
     {
         HostId = hostId;
-        Debug.Log($"[NetworkManager] hostId ภ๚ภๅตส: {HostId}");
     }
 
     private void OnDestroy()

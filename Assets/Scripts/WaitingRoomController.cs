@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
@@ -26,7 +27,7 @@ public class WaitingRoomController : MonoBehaviour
     void Start()
     {
         // 내 캐릭터 생성
-        Vector3 spawnPos = new Vector3(Random.Range(-3f, 3f), 0, Random.Range(-3f, 3f));
+        Vector3 spawnPos = new Vector3(UnityEngine.Random.Range(-3f, 3f), 0, UnityEngine.Random.Range(-3f, 3f));
         myCharacter = Instantiate(myCharacterPrefab, spawnPos, Quaternion.identity);
 
         FollowCamera followCam = Camera.main.GetComponent<FollowCamera>();
@@ -79,7 +80,7 @@ public class WaitingRoomController : MonoBehaviour
             }
             catch (System.Exception ex)
             {
-                Debug.LogError("❌ move 이벤트 파싱 실패: " + ex.Message);
+                Debug.LogError(" move 이벤트 파싱 실패: " + ex.Message);
             }
         });
 
@@ -104,7 +105,7 @@ public class WaitingRoomController : MonoBehaviour
             }
             catch (System.Exception ex)
             {
-                Debug.LogError("❌ roomPlayerCount 파싱 실패: " + ex.Message);
+                Debug.LogError(" roomPlayerCount 파싱 실패: " + ex.Message);
             }
         });
 
@@ -114,7 +115,6 @@ public class WaitingRoomController : MonoBehaviour
         string hostId = NetworkManager.Instance.HostId;
         bool isHost = hostId == NetworkManager.Instance.socket.Id;
         startGameButton.gameObject.SetActive(isHost);
-        Debug.Log($"[WaitingRoomController] 내 ID: {NetworkManager.Instance.socket.Id}, 방장 ID: {hostId}, 방장 여부: {isHost}");
         // 게임 시작 버튼 클릭 이벤트
         startGameButton.onClick.AddListener(OnStartGameClicked);
 
@@ -126,7 +126,7 @@ public class WaitingRoomController : MonoBehaviour
         {
             MainThreadDispatcher.Enqueue(() =>
             {
-                Debug.Log("게임 시작됨!");
+                CharacterMovement.DeadPlayerIds.Clear();
                 SceneManager.LoadScene("Game");
             });
         });
@@ -145,16 +145,44 @@ public class WaitingRoomController : MonoBehaviour
             });
         });
 
+        NetworkManager.Instance.socket.On("playerLeft", (data) =>
+        {
+            try
+            {
+                JArray arr = JArray.Parse(data.ToString());
+                if (arr.Count == 0) return;
+
+                JObject json = (JObject)arr[0];
+                string leftPlayerId = json["playerId"]?.ToString();
+
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (WaitingRoomController.otherPlayers.TryGetValue(leftPlayerId, out GameObject leftPlayerObj))
+                    {
+                        Destroy(leftPlayerObj);
+                        WaitingRoomController.otherPlayers.Remove(leftPlayerId);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("playerLeft 이벤트 처리 실패: " + ex.Message);
+            }
+        });
+
         // 방장 변경 시 버튼 갱신
         NetworkManager.Instance.socket.On("hostChanged", (data) =>
         {
-            JObject json = JObject.Parse(data.ToString());
+            JArray arr = JArray.Parse(data.ToString());
+            if (arr.Count == 0) return;
+
+            JObject json = (JObject)arr[0];
             string newHostId = json["hostId"]?.ToString();
             NetworkManager.Instance.SetHostId(newHostId);
 
             MainThreadDispatcher.Enqueue(() =>
             {
-                bool isHost = (newHostId == NetworkManager.Instance.socket.Id);
+                bool isHost = newHostId == NetworkManager.Instance.socket.Id;
                 startGameButton.gameObject.SetActive(isHost);
             });
         });
@@ -172,8 +200,6 @@ public class WaitingRoomController : MonoBehaviour
 
     public void OnLeaveRoomClicked()
     {
-        Debug.Log("방 나가기 요청");
-
         NetworkManager.Instance.socket.Emit("leaveRoom", new
         {
             roomId = NetworkManager.Instance.socket.Id

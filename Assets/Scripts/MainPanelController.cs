@@ -144,7 +144,21 @@ public class MainPanelController : MonoBehaviour
                         {
                             NetworkManager.Instance.socket.Emit("joinRoom", new { roomId = selectedRoomId });
                             
-                            NetworkManager.Instance.socket.On("joinedRoom", (e) => { });
+                            NetworkManager.Instance.socket.On("joinedRoom", (e) => {
+                                JArray arr = JArray.Parse(e.ToString());
+                                if (arr.Count == 0) return;
+
+                                JObject json = (JObject)arr[0];
+                                string hostId = json["hostId"]?.ToString();
+                                string joinedRoomId = json["roomId"]?.ToString();
+
+                                NetworkManager.Instance.SetHostId(hostId);
+
+                                MainThreadDispatcher.Enqueue(() =>
+                                {
+                                    SceneManager.LoadScene("Waiting Room");
+                                });
+                            });
 
                             SceneManager.LoadScene("Waiting Room");
                         });
