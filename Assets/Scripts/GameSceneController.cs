@@ -9,7 +9,7 @@ using static UnityEngine.GraphicsBuffer;
 public class GameSceneController : MonoBehaviour
 {
     [SerializeField] private TMP_Text spectatorHintText;
-    [SerializeField] private GameObject gameResultPanelPrefab; // 결과 UI 프리팹
+    [SerializeField] private GameObject gameResultPanelPrefab;
     private GameObject currentResultPanel;
 
     public GameObject myCharacterPrefab;
@@ -35,6 +35,7 @@ public class GameSceneController : MonoBehaviour
             followCam.SetTarget(myCharacter.transform);
         }
 
+        //캐릭터 움직임 처리
         NetworkManager.Instance.socket.On("move", (data) =>
         {
             try
@@ -86,6 +87,7 @@ public class GameSceneController : MonoBehaviour
             }
         });
 
+        //게임 종료 처리
         NetworkManager.Instance.socket.On("gameEnded", (data) =>
         {
             JArray arr = JArray.Parse(data.ToString());
@@ -199,7 +201,6 @@ public class GameSceneController : MonoBehaviour
     {
         yield return new WaitForSeconds(seconds);
 
-        // 씬 전환
         SceneManager.LoadScene("Waiting Room");
     }
 }

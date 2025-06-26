@@ -20,6 +20,7 @@ public class HungerSystem : MonoBehaviour
         StartCoroutine(HungerDecreaseLoop());
     }
 
+    // 배고픔 게이지 감소
     private IEnumerator HungerDecreaseLoop()
     {
         while (isAlive)
@@ -30,6 +31,7 @@ public class HungerSystem : MonoBehaviour
             currentHunger = Mathf.Clamp(currentHunger, 0, maxHunger);
             UpdateUI();
 
+            // 배고픔이 0 이하로 떨어지면 굶주림 상태로 전환
             if (currentHunger <= 0 && !starving)
             {
                 starving = true;
@@ -41,7 +43,7 @@ public class HungerSystem : MonoBehaviour
 
     private IEnumerator HandleStarvation()
     {
-        // 디버프 처리 (속도 감소 등)
+        // 디버프 처리 (속도 감소)
         GetComponent<CharacterMovement>()?.SetMovementSpeed(1.0f);
 
         yield return new WaitForSeconds(30f);
@@ -55,6 +57,7 @@ public class HungerSystem : MonoBehaviour
         }
     }
 
+    // 플레이어가 음식을 먹었을 때 처리
     public void Eat(float amount)
     {
         if (!isAlive) return;
@@ -63,6 +66,7 @@ public class HungerSystem : MonoBehaviour
         currentHunger = Mathf.Clamp(currentHunger, 0, maxHunger);
         UpdateUI();
 
+        // 굶주림 상태에서 벗어났다면 디버프 제거
         if (starving && currentHunger > 0)
         {
             starving = false;

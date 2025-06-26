@@ -45,7 +45,7 @@ public class CharacterMovement : MonoBehaviour
     private bool isDead = false;
     private float seconds = 1f;
     private bool killUsed = false;
-    private bool canKill = false; // 처음에는 Kill 불가
+    private bool canKill = false;
     private PlayerRole myRole = PlayerRole.Crew;
     private bool isKillableScene = false;
     private string currentSceneName;
@@ -66,7 +66,7 @@ public class CharacterMovement : MonoBehaviour
 
     void Start()
     {
-
+        //역할배정
         NetworkManager.Instance.socket.On("assignRole", response =>
         {
             try
@@ -114,7 +114,7 @@ public class CharacterMovement : MonoBehaviour
             if (killButton != null)
             {
                 killButton.onClick.AddListener(OnKillButtonClicked);
-                killButton.interactable = false; // 처음에는 비활성화
+                killButton.interactable = false;
             }
 
             StartCoroutine(KillCooldownRoutine());
@@ -138,7 +138,7 @@ public class CharacterMovement : MonoBehaviour
                 }
             }
         });
-
+        //킬 당했을 때 처리
         NetworkManager.Instance.socket.On("killed", (data) =>
         {
             try
@@ -181,7 +181,7 @@ public class CharacterMovement : MonoBehaviour
                 Debug.LogError("killed 파싱 실패: " + ex.Message);
             }
         });
-
+        // // 시체 먹었을 때 처리
         NetworkManager.Instance.socket.On("corpseEaten", (data) =>
         {
             try
@@ -224,7 +224,7 @@ public class CharacterMovement : MonoBehaviour
         StartCoroutine(ApplyRoleWhenReady());
     }
 
-    
+    //역할에 따른 ui 설정
     private IEnumerator ApplyRoleWhenReady()
     {
         while (NetworkManager.Instance.AssignedRoleRaw == null || !uiReady)
@@ -245,7 +245,7 @@ public class CharacterMovement : MonoBehaviour
             Move();
         }
     }
-
+    
     void Move()
     {
         horizontal = Input.GetAxisRaw("Horizontal");
@@ -277,7 +277,7 @@ public class CharacterMovement : MonoBehaviour
             animator.SetBool("Walk", false);
         }
     }
-
+    //근처 적 찾기
     private GameObject FindClosestKillableTarget()
     {
         float minDist = float.MaxValue;
@@ -303,7 +303,7 @@ public class CharacterMovement : MonoBehaviour
     {
         yield return new WaitForSeconds(seconds);
     }
-    
+    //죽었을 때 처리
     public void SetDead()
     {
         isDead = true;
@@ -320,7 +320,7 @@ public class CharacterMovement : MonoBehaviour
         {
             killButtonText.text = null; 
         }
-
+        //관전 모드
         var gsc = FindObjectOfType<GameSceneController>();
         if (gsc != null)
         {
@@ -426,17 +426,17 @@ public class CharacterMovement : MonoBehaviour
 
         canKill = true;
     }
-    
+    //굶었을 때 등 속도 감소 증가 처리
     public void SetMovementSpeed(float newSpeed)
     {
         moveSpeed = newSpeed;
     }
-
+    
     public bool GetFlipX()
     {
         return spriteRenderer.flipX;
     }
-
+    //임포스터 시체 먹기 
     void OnEatButtonClicked()
     {
         if (myRole != PlayerRole.Imposter) return;
@@ -465,7 +465,7 @@ public class CharacterMovement : MonoBehaviour
         {
         }
     }
-
+    //근처 시체 찾기
     private GameObject FindClosestDeadBody()
     {
         float minDist = float.MaxValue;
@@ -500,14 +500,14 @@ public class CharacterMovement : MonoBehaviour
             return;
         }
 
-        isFishing = true; // 이동 금지 플래그
+        isFishing = true;
 
         GameObject FishingPanel = Instantiate(FishingPanelPrefab, Vector3.zero, Quaternion.identity);
         TMP_Text resultText = FishingPanel.transform.Find("FishingPanel/FishingText")?.GetComponent<TMP_Text>();
 
         if (resultText != null)
         {
-            resultText.gameObject.SetActive(false); // 시작 시 숨기기
+            resultText.gameObject.SetActive(false);
         }
 
         StartCoroutine(StartFishingCooldown());
@@ -541,7 +541,7 @@ public class CharacterMovement : MonoBehaviour
             if (fishingCooldownText != null)
             {
                 fishingCooldownText.text = $"{Mathf.CeilToInt(remainingTime)}초";
-                fishingButton.interactable = false; // 쿨타임 동안 버튼 비활성화
+                fishingButton.interactable = false; 
             }
 
             yield return new WaitForSeconds(1f);
@@ -552,7 +552,7 @@ public class CharacterMovement : MonoBehaviour
         fishingButton.interactable = true;
         if (fishingCooldownText != null)
         {
-            fishingCooldownText.text = ""; // 쿨타임 종료 시 텍스트 초기화
+            fishingCooldownText.text = "";
         }
     }
 
@@ -571,7 +571,7 @@ public class CharacterMovement : MonoBehaviour
             resultText.gameObject.SetActive(true);
         }
 
-        yield return new WaitForSeconds(1f); // 결과 보여준 후
+        yield return new WaitForSeconds(1f); 
 
         if (panel != null)
         {

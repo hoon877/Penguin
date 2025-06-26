@@ -17,9 +17,9 @@ public class WaitingRoomController : MonoBehaviour
     private GameObject myCharacter;
 
     [Header("UI Elements")]
-    public TMP_Text playerCountText;   // 방 인원 수 표시용 텍스트
-    public Button startGameButton;     // 게임 시작 버튼
-    public Button leaveRoomButton;     // 방 나가기 버튼
+    public TMP_Text playerCountText;   
+    public Button startGameButton;    
+    public Button leaveRoomButton;     
 
     private int currentPlayers = 0;
     private int maxPlayers = 0;
@@ -131,7 +131,7 @@ public class WaitingRoomController : MonoBehaviour
             });
         });
 
-        // 방 참가 시 방장 정보 수신 → 버튼 제어
+        // 방 참가 시 방장 정보 수신 
         NetworkManager.Instance.socket.On("joinedRoom", (data) =>
         {
             JObject json = JObject.Parse(data.ToString());
@@ -144,7 +144,7 @@ public class WaitingRoomController : MonoBehaviour
                 startGameButton.gameObject.SetActive(isHost);
             });
         });
-
+        // 나간 플레이어 처리
         NetworkManager.Instance.socket.On("playerLeft", (data) =>
         {
             try

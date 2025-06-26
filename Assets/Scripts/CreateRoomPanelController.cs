@@ -12,7 +12,8 @@ public class CreateRoomPanelController : MonoBehaviour
     public TMP_InputField roomNameInput;
     public TMP_Dropdown maxPlayerDropdown;
     [SerializeField] private GameObject targetPanelToDestroy;
-    
+
+    //방 만들기
     public void OnClickCreateRoomButton()
     {
         _roomName = roomNameInput.text;

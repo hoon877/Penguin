@@ -41,17 +41,19 @@ public class MainPanelController : MonoBehaviour
     private string _roomId;
     private string _roomName;
     
-    [SerializeField] private Transform roomListParent;         // 생성 위치
+    [SerializeField] private Transform roomListParent;
     [SerializeField] private GameObject roomPanelPrefab;
     [SerializeField] private GameObject roomEntryPrefab;
     [SerializeField] private GameObject createRoomPanelPrefab;
     [SerializeField] private Transform createRoomPanelParent;  
     
+    //방 만들기
     public void OnClickCreateRoomButton()
     {
         Instantiate(createRoomPanelPrefab, createRoomPanelParent);
     }
-    
+
+    //방 목록 가져오기
     public void OnClickGetRoomListButton()
     {
         NetworkManager.Instance.socket.Emit("getRoomList");
@@ -65,8 +67,8 @@ public class MainPanelController : MonoBehaviour
 
                 if (json.TrimStart().StartsWith("["))
                 {
-                    JArray rawArray = JArray.Parse(json);       // 전체가 이중 배열
-                    JArray roomArray = (JArray)rawArray[0];     // 내부 진짜 room 배열
+                    JArray rawArray = JArray.Parse(json);       
+                    JArray roomArray = (JArray)rawArray[0];     
 
                     foreach (var token in roomArray)
                     {
@@ -111,16 +113,15 @@ public class MainPanelController : MonoBehaviour
                 
                 MainThreadDispatcher.Enqueue(() =>
                 {
-                    // RoomPanelPrefab 하나만 생성
                     GameObject roomPanel = Instantiate(roomPanelPrefab, roomListParent);
 
-                    // ✅ 닫기 버튼 핸들링
+                    //닫기 버튼 핸들링
                     Button closeButton = roomPanel.transform.Find("CloseButton")?.GetComponent<Button>();
                     if (closeButton != null)
                     {
                         closeButton.onClick.AddListener(() =>
                         {
-                            Destroy(roomPanel);  // 방 리스트 UI 제거
+                            Destroy(roomPanel); 
                         });
                     }
 
@@ -142,6 +143,7 @@ public class MainPanelController : MonoBehaviour
                         string selectedRoomId = room.roomId;
                         joinButton.onClick.AddListener(() =>
                         {
+                            //방 들어가기
                             NetworkManager.Instance.socket.Emit("joinRoom", new { roomId = selectedRoomId });
                             
                             NetworkManager.Instance.socket.On("joinedRoom", (e) => {
